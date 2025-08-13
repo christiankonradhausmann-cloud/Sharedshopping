@@ -59,15 +59,15 @@
     import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc } 
       from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
 
-    // 🔹 Hier deine Firebase-Konfiguration einsetzen
+    // 🔹 Deine Firebase-Konfiguration
     const firebaseConfig = {
-        apiKey: "AIzaSyBpdSLE4T0HhHj9x3664a7DnxC2043JU",
-        authDomain: "shoppinglist-66fa7.firebaseapp.com",    
-        projectId: "shoppinglist-66fa7",
-        storageBucket: "shoppinglist-66fa7.appspot.com",  
-        messagingSenderId: "53181558287",
-        appId: "1:53181558287:web:22e89caC4fde099361c10a"
-};
+      apiKey: "AIzaSyBpdSLE4T0HhHj9x3664a7DnxC2043JU",
+      authDomain: "shoppinglist-66fa7.firebaseapp.com",
+      projectId: "shoppinglist-66fa7",
+      storageBucket: "shoppinglist-66fa7.appspot.com",
+      messagingSenderId: "53181558287",
+      appId: "1:53181558287:web:22e89caC4fde099361c10a"
+    };
 
     // Firebase & Firestore initialisieren
     const app = initializeApp(firebaseConfig);
@@ -106,4 +106,4 @@
     addBtn.addEventListener("click", addItem);
   </script>
 </body>
-</html>	
+</html>
