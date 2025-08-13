@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Einkaufsliste</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 400px;
+      margin: auto;
+      padding: 1rem;
+      background: #f7f7f7;
+    }
+    h1 {
+      text-align: center;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      background: white;
+      margin: 0.5rem 0;
+      padding: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 5px;
+    }
+    button {
+      background: crimson;
+      border: none;
+      color: white;
+      padding: 0.2rem 0.5rem;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    input {
+      width: 70%;
+      padding: 0.5rem;
+      margin-right: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Einkaufsliste 🛒</h1>
+
+  <div>
+    <input id="itemInput" type="text" placeholder="Neuer Artikel..." />
+    <button id="addBtn">➕</button>
+  </div>
+
+  <ul id="list"></ul>
+
+  <script type="module">
+    // Firebase SDKs laden
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc } 
+      from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
+
+    // 🔹 Hier deine Firebase-Konfiguration einsetzen
+    const firebaseConfig = {
+      apiKey: "DEIN_API_KEY",
+      authDomain: "DEIN_AUTH_DOMAIN",
+      projectId: "DEIN_PROJECT_ID",
+      storageBucket: "DEIN_STORAGE_BUCKET",
+      messagingSenderId: "DEIN_MESSAGING_SENDER_ID",
+      appId: "DEIN_APP_ID"
+    };
+
+    // Firebase & Firestore initialisieren
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const listEl = document.getElementById("list");
+    const itemInput = document.getElementById("itemInput");
+    const addBtn = document.getElementById("addBtn");
+
+    // 🔹 Echtzeit-Listener für alle Items
+    onSnapshot(collection(db, "items"), (snapshot) => {
+      listEl.innerHTML = "";
+      snapshot.forEach((docSnap) => {
+        const li = document.createElement("li");
+        li.textContent = docSnap.data().name;
+
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "🗑";
+        delBtn.onclick = () => deleteDoc(doc(db, "items", docSnap.id));
+
+        li.appendChild(delBtn);
+        listEl.appendChild(li);
+      });
+    });
+
+    // 🔹 Neues Item hinzufügen
+    async function addItem() {
+      const name = itemInput.value.trim();
+      if (name) {
+        await addDoc(collection(db, "items"), { name });
+        itemInput.value = "";
+      }
+    }
+
+    // Button-Klick verbinden
+    addBtn.addEventListener("click", addItem);
+  </script>
+</body>
+</html>	
