@@ -333,8 +333,21 @@
       const snap = await getDocs(collection(db, "items"));
       let total = 0, checked = 0;
       snap.forEach(d => { total++; if (selectedIds.has(d.id)) checked++; });
+
       const selectAll = checked !== total;
-      snap.forEach(d => { if (selectAll) selectedIds.add(d.id); else selectedIds.delete(d.id); });
+      snap.forEach(d => {
+        if (selectAll) {
+          selectedIds.add(d.id);
+        } else {
+          selectedIds.delete(d.id);
+        }
+      });
+
+      // DOM-Checkboxen anpassen
+      document.querySelectorAll(".cb-small").forEach(cb => {
+        cb.checked = selectAll;
+      });
+
       updateSelectionUI();
     };
 
