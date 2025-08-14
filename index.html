@@ -26,7 +26,6 @@
       text-align: center;
       margin: 0 0 1rem 0;
     }
-
     .row {
       display: flex;
       gap: .5rem;
@@ -40,7 +39,6 @@
       background: #fff;
       font-size: 1rem;
     }
-
     button {
       border: none;
       color: #fff;
@@ -52,10 +50,11 @@
     }
     .btn-add { background: var(--green); }
     .btn-del { background: var(--red); padding: .4rem .55rem; border-radius: 8px; min-width: 2.2rem; text-align: center; }
-    .btn-clear { background: var(--red); }
     .btn-undo { background: var(--blue); }
     .btn-secondary { background: #444; }
     .btn-muted { background: #bbb; color: #222; }
+    .btn-mic { background: var(--blue); }
+    .btn-play { background: #555; }
 
     ul {
       list-style: none;
@@ -80,11 +79,7 @@
       text-overflow: ellipsis;
       padding-right: .25rem;
     }
-    .tools {
-      display: flex;
-      gap: .4rem;
-    }
-
+    .tools { display: flex; gap: .4rem; flex-wrap: wrap; }
     .bulk-bar {
       display: flex;
       gap: .5rem;
@@ -93,10 +88,9 @@
       margin-top: 1rem;
       flex-wrap: wrap;
     }
-    .bulk-left, .bulk-right {
-      display: flex; gap: .5rem; align-items: center;
-    }
+    .bulk-left, .bulk-right { display: flex; gap: .5rem; align-items: center; }
     .hint { color: var(--muted); font-size: .9rem; }
+    .note { color: var(--muted); font-size: .85rem; margin-top: .25rem; }
   </style>
 </head>
 <body>
@@ -120,16 +114,21 @@
     <div class="bulk-right">
       <button id="undoBtn" class="btn-undo" style="display:none;" title="Letzten Löschvorgang rückgängig machen">↩ Rückgängig</button>
       <button id="deleteSelectedBtn" class="btn-del btn-muted" disabled title="Ausgewählte Einträge löschen">Ausgewählte löschen</button>
-      <button id="clearAllBtn" class="btn-clear" title="Alle Einträge löschen">Alles löschen</button>
     </div>
   </div>
 
+  <p class="note">Hinweis: Du kannst pro Eintrag eine Sprachnotiz (max. 60 s) aufnehmen. 🎙️</p>
+
   <script type="module">
+    // Firebase SDKs laden
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
     import {
       getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc,
-      getDocs, writeBatch
+      getDocs, writeBatch, updateDoc
     } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
+    import {
+      getStorage, ref, uploadBytes, getDownloadURL
+    } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-storage.js";
 
     // 🔹 Deine Firebase-Konfiguration
     const firebaseConfig = {
@@ -141,26 +140,35 @@
       appId: "1:53181558287:web:22e89caC4fde099361c10a"
     };
 
+    // Firebase init
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const storage = getStorage(app);
 
     // DOM-Refs
     const listEl = document.getElementById("list");
     const itemInput = document.getElementById("itemInput");
     const addBtn = document.getElementById("addBtn");
-    const clearAllBtn = document.getElementById("clearAllBtn");
     const undoBtn = document.getElementById("undoBtn");
     const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
     const toggleAllBtn = document.getElementById("toggleAllBtn");
     const selectionHint = document.getElementById("selectionHint");
 
-    // Auswahl-Status zwischenspeichern, damit Häkchen bei Live-Updates erhalten bleiben
+    // Auswahl & Undo
     const selectedIds = new Set();
-    let lastDeletedItems = []; // für Undo (Bulk oder Alles‑löschen)
+    let lastDeletedItems = []; // { id, name, voiceUrl? }
+
+    // Aufnahme-Status
+    let mediaRecorder = null;
+    let recordingForId = null;
+    let recordTimeout = null;
+    let chunks = [];
+
+    // Feature-Check
+    const canRecord = !!(navigator.mediaDevices && window.MediaRecorder);
 
     // Render via Echtzeit-Listener
     onSnapshot(collection(db, "items"), (snapshot) => {
-      // Map mit aktuellen IDs, um alte Auswahl zu säubern
       const currentIds = new Set();
       listEl.innerHTML = "";
 
@@ -186,15 +194,38 @@
         name.className = "item-name";
         name.textContent = data.name;
 
+        // Tools: Play (falls vorhanden), Record, Delete
+        const tools = document.createElement("div");
+        tools.className = "tools";
+
+        // Play
+        const playBtn = document.createElement("button");
+        playBtn.className = "btn-play";
+        playBtn.textContent = "🔊";
+        playBtn.title = data.voiceUrl ? "Sprachnotiz abspielen" : "Keine Sprachnotiz vorhanden";
+        playBtn.disabled = !data.voiceUrl;
+        playBtn.onclick = () => {
+          if (!data.voiceUrl) return;
+          const audio = new Audio(data.voiceUrl);
+          audio.play();
+        };
+        tools.appendChild(playBtn);
+
+        // Record
+        const recBtn = document.createElement("button");
+        recBtn.className = "btn-mic";
+        recBtn.textContent = (recordingForId === id) ? "■ Stopp" : "🎙️";
+        recBtn.title = canRecord ? "Sprachnotiz aufnehmen (max. 60 s)" : "Aufnahme nicht unterstützt";
+        recBtn.disabled = !canRecord;
+        recBtn.onclick = () => toggleRecord(id, recBtn, playBtn);
+        tools.appendChild(recBtn);
+
         // Einzel-Löschen
         const delBtn = document.createElement("button");
         delBtn.className = "btn-del";
         delBtn.textContent = "🗑";
         delBtn.title = "Eintrag löschen";
         delBtn.onclick = () => deleteDoc(doc(db, "items", id));
-
-        const tools = document.createElement("div");
-        tools.className = "tools";
         tools.appendChild(delBtn);
 
         li.appendChild(checkbox);
@@ -203,10 +234,78 @@
         listEl.appendChild(li);
       });
 
-      // Auswahl auf nicht mehr existierende IDs aufräumen
+      // Auswahl aufräumen, falls Items verschwunden sind
       [...selectedIds].forEach(id => { if (!currentIds.has(id)) selectedIds.delete(id); });
       updateSelectionUI();
     });
+
+    // Aufnahme starten/stoppen & speichern
+    async function toggleRecord(itemId, recBtn, playBtn) {
+      try {
+        if (recordingForId === itemId && mediaRecorder && mediaRecorder.state === "recording") {
+          // Stopp
+          mediaRecorder.stop();
+          recBtn.textContent = "🎙️";
+          clearTimeout(recordTimeout);
+          return;
+        }
+
+        // Falls andere Aufnahme läuft: abbrechen
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+          mediaRecorder.stop();
+          clearTimeout(recordTimeout);
+        }
+
+        // Neue Aufnahme
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        chunks = [];
+        mediaRecorder = new MediaRecorder(stream, { mimeType: getPreferredMimeType() });
+        recordingForId = itemId;
+
+        mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+        mediaRecorder.onstop = async () => {
+          const blob = new Blob(chunks, { type: mediaRecorder.mimeType });
+          // Max. 60 s sind schon durch Timeout gesichert – jetzt hochladen
+          await uploadVoice(itemId, blob, playBtn);
+          // Streams beenden
+          stream.getTracks().forEach(t => t.stop());
+          recordingForId = null;
+        };
+
+        mediaRecorder.start();
+        recBtn.textContent = "■ Stopp";
+        // Nach 60 s automatisch stoppen
+        recordTimeout = setTimeout(() => {
+          if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+        }, 60000);
+
+      } catch (err) {
+        alert("Konnte Mikrofon nicht verwenden: " + err.message);
+      }
+    }
+
+    function getPreferredMimeType() {
+      // Versuche gängige Audio-MIME-Typen; iOS Safari unterstützt idR audio/webm
+      const types = ["audio/webm", "audio/mp4", "audio/ogg"];
+      for (const t of types) {
+        if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) return t;
+      }
+      return ""; // Browser wählt Standard
+    }
+
+    async function uploadVoice(itemId, blob, playBtn) {
+      try {
+        const ext = blob.type.includes("webm") ? "webm" : blob.type.includes("ogg") ? "ogg" : "m4a";
+        const objectRef = ref(storage, `voiceNotes/${itemId}.${ext}`);
+        await uploadBytes(objectRef, blob);
+        const url = await getDownloadURL(objectRef);
+        await updateDoc(doc(db, "items", itemId), { voiceUrl: url, voiceUpdatedAt: Date.now() });
+        playBtn.disabled = false;
+        playBtn.title = "Sprachnotiz abspielen";
+      } catch (e) {
+        alert("Upload fehlgeschlagen: " + e.message);
+      }
+    }
 
     // Hinzufügen
     async function addItem() {
@@ -217,37 +316,21 @@
       itemInput.focus();
     }
 
-    // Alles löschen (mit Undo)
-    async function clearAll() {
-      if (!confirm("Wirklich alle Einträge löschen?")) return;
-      const itemsRef = collection(db, "items");
-      const snap = await getDocs(itemsRef);
-      if (snap.empty) return;
-
-      lastDeletedItems = [];
-      snap.forEach(d => lastDeletedItems.push({ id: d.id, ...d.data() }));
-
-      const batch = writeBatch(db);
-      snap.forEach(d => batch.delete(doc(db, "items", d.id)));
-      await batch.commit();
-
-      // Auswahl zurücksetzen, Undo anbieten
-      selectedIds.clear();
-      updateSelectionUI();
-      if (lastDeletedItems.length > 0) undoBtn.style.display = "inline-block";
-    }
-
     // Ausgewählte löschen (mit Undo)
     async function deleteSelected() {
       if (selectedIds.size === 0) return;
       if (!confirm(`${selectedIds.size} ausgewählte Einträge löschen?`)) return;
 
-      // Zu löschende Items für Undo puffern
+      // Items für Undo puffern
       lastDeletedItems = [];
-      // Wir lesen die Items einmal, um die Namen zu sichern
       const snap = await getDocs(collection(db, "items"));
       const toDelete = [];
-      snap.forEach(d => { if (selectedIds.has(d.id)) { lastDeletedItems.push({ id: d.id, ...d.data() }); toDelete.push(d.id); }});
+      snap.forEach(d => {
+        if (selectedIds.has(d.id)) {
+          lastDeletedItems.push({ id: d.id, ...d.data() });
+          toDelete.push(d.id);
+        }
+      });
       if (toDelete.length === 0) return;
 
       const batch = writeBatch(db);
@@ -261,32 +344,24 @@
 
     // „Alle auswählen“ / „Auswahl aufheben“
     async function toggleSelectAll() {
-      // Wenn bereits alle ausgewählt sind → abwählen, sonst alle auswählen
       const snap = await getDocs(collection(db, "items"));
       let total = 0, checked = 0;
-      snap.forEach(d => {
-        total++;
-        if (selectedIds.has(d.id)) checked++;
-      });
-
-      const selectAll = checked !== total; // true, wenn nicht alle markiert sind
-      snap.forEach(d => {
-        if (selectAll) selectedIds.add(d.id);
-        else selectedIds.delete(d.id);
-      });
+      snap.forEach(d => { total++; if (selectedIds.has(d.id)) checked++; });
+      const selectAll = checked !== total;
+      snap.forEach(d => { if (selectAll) selectedIds.add(d.id); else selectedIds.delete(d.id); });
       updateSelectionUI();
     }
 
     // Undo (stellt letzte Lösch-Operation wieder her)
     async function undoDelete() {
       if (lastDeletedItems.length === 0) return;
-      // Inhalte wieder hinzufügen (IDs werden neu generiert – für unsere Liste egal)
       for (const item of lastDeletedItems) {
-        await addDoc(collection(db, "items"), { name: item.name });
+        const payload = { name: item.name };
+        if (item.voiceUrl) payload.voiceUrl = item.voiceUrl;
+        await addDoc(collection(db, "items"), payload);
       }
       lastDeletedItems = [];
       undoBtn.style.display = "none";
-      // Auswahl bleibt leer
       selectedIds.clear();
       updateSelectionUI();
       alert("Auswahl wiederhergestellt.");
@@ -298,14 +373,14 @@
       selectionHint.textContent = `${count} ausgewählt`;
       deleteSelectedBtn.disabled = count === 0;
       deleteSelectedBtn.classList.toggle("btn-muted", count === 0);
-      toggleAllBtn.textContent = (count > 0 && count === listEl.children.length && count !== 0)
+      const total = listEl.children.length;
+      toggleAllBtn.textContent = (count > 0 && count === total && count !== 0)
         ? "Auswahl aufheben" : "Alle auswählen";
     }
 
     // Events
     addBtn.addEventListener("click", addItem);
     itemInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addItem(); });
-    clearAllBtn.addEventListener("click", clearAll);
     deleteSelectedBtn.addEventListener("click", deleteSelected);
     toggleAllBtn.addEventListener("click", toggleSelectAll);
     undoBtn.addEventListener("click", undoDelete);
