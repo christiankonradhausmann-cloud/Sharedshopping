@@ -8,6 +8,7 @@
     :root {
       --green: #2ecc71;
       --red: #e74c3c;
+      --blue: #3498db;
       --bg: #f7f7f7;
       --card: #ffffff;
     }
@@ -52,6 +53,11 @@
       margin-top: 1rem;
       float: right;
     }
+    .btn-undo {
+      background: var(--blue);
+      margin-top: 1rem;
+      float: left;
+    }
     ul {
       list-style: none;
       padding: 0;
@@ -84,7 +90,7 @@
   </style>
 </head>
 <body>
-  <h1>SharedShopping 🛒</h1>
+  <h1>Shared Shopping 🛒</h1>
 
   <div class="row">
     <input id="itemInput" type="text" placeholder="Neuer Artikel …" />
@@ -93,7 +99,10 @@
 
   <ul id="list"></ul>
 
-  <button id="clearAllBtn" class="btn-clear" title="Alle Einträge löschen">Alles löschen</button>
+  <div>
+    <button id="undoBtn" class="btn-undo" title="Letzten Löschvorgang rückgängig machen" style="display:none;">↩ Rückgängig</button>
+    <button id="clearAllBtn" class="btn-clear" title="Alle Einträge löschen">Alles löschen</button>
+  </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
@@ -118,6 +127,9 @@
     const itemInput = document.getElementById("itemInput");
     const addBtn = document.getElementById("addBtn");
     const clearAllBtn = document.getElementById("clearAllBtn");
+    const undoBtn = document.getElementById("undoBtn");
+
+    let lastDeletedItems = [];
 
     onSnapshot(collection(db, "items"), (snapshot) => {
       listEl.innerHTML = "";
@@ -155,9 +167,26 @@
       const snap = await getDocs(itemsRef);
       if (snap.empty) return;
 
+      // Speichern, um rückgängig machen zu können
+      lastDeletedItems = [];
+      snap.forEach(d => lastDeletedItems.push(d.data()));
+
       const batch = writeBatch(db);
       snap.forEach(d => batch.delete(doc(db, "items", d.id)));
       await batch.commit();
+
+      if (lastDeletedItems.length > 0) {
+        undoBtn.style.display = "inline-block";
+      }
+    }
+
+    async function undoDelete() {
+      if (lastDeletedItems.length === 0) return;
+      for (const item of lastDeletedItems) {
+        await addDoc(collection(db, "items"), item);
+      }
+      lastDeletedItems = [];
+      undoBtn.style.display = "none";
     }
 
     addBtn.addEventListener("click", addItem);
@@ -165,6 +194,7 @@
       if (e.key === "Enter") addItem();
     });
     clearAllBtn.addEventListener("click", clearAll);
+    undoBtn.addEventListener("click", undoDelete);
   </script>
 </body>
 </html>
