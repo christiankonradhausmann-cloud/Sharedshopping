@@ -25,8 +25,14 @@
       border: 1px solid #ddd;
     }
     input[type="text"] {
+      padding: 0.4rem;
+    }
+    .input-name {
+      flex: 2;
+      margin-right: 0.5rem;
+    }
+    .input-qty {
       flex: 1;
-      padding: 0.5rem;
       margin-right: 0.5rem;
     }
     button {
@@ -38,7 +44,7 @@
       display: flex;
       align-items: center;
       gap: 4px;
-      margin-left: 6px; /* etwas Abstand zwischen Buttons */
+      margin-left: 6px;
     }
     .btn-add { background: #2ecc71; }
     .btn-del { background: #e74c3c; }
@@ -59,7 +65,7 @@
     .visualizer {
       width: 40px;
       height: 20px;
-      margin-right: 6px; /* Abstand rechts vom Visualizer */
+      margin-right: 6px;
     }
     .disabled {
       opacity: 0.5;
@@ -69,13 +75,17 @@
       display: flex;
       align-items: center;
     }
+    .editable {
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
   <h1>Shared Shopping 🛒</h1>
 
   <div style="display:flex; margin-bottom:1rem;">
-    <input id="itemInput" type="text" placeholder="Neuer Artikel..." />
+    <input id="itemName" class="input-name" type="text" placeholder="Artikel..." />
+    <input id="itemQty" class="input-qty" type="text" placeholder="Menge..." />
     <button id="addBtn" class="btn-add disabled">➕</button>
   </div>
 
@@ -106,7 +116,8 @@
     let authReady = false;
     const addBtn = document.getElementById("addBtn");
     const listEl = document.getElementById("list");
-    const itemInput = document.getElementById("itemInput");
+    const nameInput = document.getElementById("itemName");
+    const qtyInput = document.getElementById("itemQty");
 
     onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -124,38 +135,71 @@
         alert("Warte auf Anmeldung...");
         return;
       }
-      const name = itemInput.value.trim();
+      const name = nameInput.value.trim();
+      const qty = qtyInput.value.trim();
       if (!name) return;
-      await addDoc(collection(db, "items"), { name });
-      itemInput.value = "";
+      await addDoc(collection(db, "items"), { name, quantity: qty || "" });
+      nameInput.value = "";
+      qtyInput.value = "";
     };
+
+    function makeEditable(span, field, docRef) {
+      span.onclick = () => {
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = span.textContent;
+        span.replaceWith(input);
+        input.focus();
+        input.onblur = async () => {
+          const newValue = input.value.trim();
+          await updateDoc(docRef, { [field]: newValue });
+          span.textContent = newValue;
+          input.replaceWith(span);
+        };
+        input.onkeydown = (e) => {
+          if (e.key === "Enter") input.blur();
+        };
+      };
+    }
 
     onSnapshot(collection(db, "items"), (snapshot) => {
       listEl.innerHTML = "";
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
+        const docRef = doc(db, "items", docSnap.id);
         const li = document.createElement("li");
 
+        const infoDiv = document.createElement("div");
+        infoDiv.style.display = "flex";
+        infoDiv.style.flexDirection = "column";
+
         const nameSpan = document.createElement("span");
-        nameSpan.textContent = data.name;
-        li.appendChild(nameSpan);
+        nameSpan.textContent = data.name || "";
+        nameSpan.classList.add("editable");
+        makeEditable(nameSpan, "name", docRef);
+
+        const qtySpan = document.createElement("span");
+        qtySpan.textContent = data.quantity || "";
+        qtySpan.classList.add("editable");
+        makeEditable(qtySpan, "quantity", docRef);
+
+        infoDiv.appendChild(nameSpan);
+        infoDiv.appendChild(qtySpan);
+        li.appendChild(infoDiv);
 
         const controls = document.createElement("div");
         controls.className = "controls";
 
-        // Visualizer links
         const canvas = document.createElement("canvas");
         canvas.className = "visualizer";
         const ctx = canvas.getContext("2d");
         controls.appendChild(canvas);
 
-        // Aufnahmebutton
         const voiceBtn = document.createElement("button");
         voiceBtn.textContent = "🎙";
         voiceBtn.className = "btn-voice disabled";
         controls.appendChild(voiceBtn);
 
-        // Playbutton
         const playBtn = document.createElement("button");
         playBtn.textContent = "🔊";
         playBtn.className = "btn-play";
@@ -172,19 +216,16 @@
         };
         controls.appendChild(playBtn);
 
-        // Deletebutton
         const delBtn = document.createElement("button");
         delBtn.textContent = "🗑";
         delBtn.className = "btn-del";
-        delBtn.onclick = () => deleteDoc(doc(db, "items", docSnap.id));
+        delBtn.onclick = () => deleteDoc(docRef);
         controls.appendChild(delBtn);
 
         li.appendChild(controls);
         listEl.appendChild(li);
 
-        if (authReady) {
-          voiceBtn.classList.remove("disabled");
-        }
+        if (authReady) voiceBtn.classList.remove("disabled");
 
         let mediaRecorder = null;
         let chunks = [];
@@ -214,7 +255,7 @@
               const objectRef = ref(storage, `voiceNotes/${docSnap.id}.${ext}`);
               await uploadBytes(objectRef, blob, { contentType: blob.type });
               const url = await getDownloadURL(objectRef);
-              await updateDoc(doc(db, "items", docSnap.id), { voiceUrl: url });
+              await updateDoc(docRef, { voiceUrl: url });
 
               voiceBtn.classList.add("saved");
               setTimeout(() => voiceBtn.classList.remove("saved"), 1000);
