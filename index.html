@@ -38,7 +38,8 @@
     }
     .btn-add { background: #2ecc71; }
     .btn-del { background: #e74c3c; }
-    .btn-voice { background: #3498db; }
+    .btn-voice { background: #3498db; transition: background 0.3s; }
+    .btn-voice.saved { background: #27ae60; }
     .btn-play { background: #9b59b6; }
     .visualizer {
       width: 40px;
@@ -63,7 +64,7 @@
       getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc
     } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-storage.js";
-    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
 
     // Firebase Config
     const firebaseConfig = {
@@ -80,13 +81,26 @@
     const storage = getStorage(app);
     const auth = getAuth(app);
 
-    // anonym anmelden
-    signInAnonymously(auth).catch(e => alert("Auth-Fehler: " + e.message));
+    let authReady = false;
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        authReady = true;
+        console.log("Anonym angemeldet:", user.uid);
+      } else {
+        signInAnonymously(auth).catch(e => {
+          alert("Auth-Fehler: " + e.message);
+        });
+      }
+    });
 
     const listEl = document.getElementById("list");
     const itemInput = document.getElementById("itemInput");
 
     document.getElementById("addBtn").onclick = async () => {
+      if (!authReady) {
+        alert("Warte auf Anmeldung...");
+        return;
+      }
       const name = itemInput.value.trim();
       if (!name) return;
       await addDoc(collection(db, "items"), { name });
@@ -122,6 +136,10 @@
         let audioContext, analyser, dataArray, source;
 
         voiceBtn.onclick = async () => {
+          if (!authReady) {
+            alert("Warte auf Anmeldung...");
+            return;
+          }
           if (mediaRecorder && mediaRecorder.state === "recording") {
             mediaRecorder.stop();
             cancelAnimationFrame(animationId);
@@ -141,6 +159,10 @@
               await uploadBytes(objectRef, blob, { contentType: blob.type });
               const url = await getDownloadURL(objectRef);
               await updateDoc(doc(db, "items", docSnap.id), { voiceUrl: url });
+
+              // 🎯 Button grün aufleuchten lassen
+              voiceBtn.classList.add("saved");
+              setTimeout(() => voiceBtn.classList.remove("saved"), 1000);
             };
             mediaRecorder.start();
 
