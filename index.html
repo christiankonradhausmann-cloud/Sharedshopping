@@ -66,7 +66,7 @@
   .bulk-bar {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: center; /* Buttons und Text bündig */
     margin-top: .75rem;
     flex-wrap: wrap;
     gap: .5rem;
@@ -129,7 +129,7 @@
     </div>
     <div class="bulk-right">
       <button id="undoBtn" class="btn-secondary" style="display:none;">↩ Rückgängig</button>
-      <button id="deleteSelectedBtn" class="btn-del btn-muted" disabled>Auswahl löschen</button>
+      <button id="deleteSelectedBtn" class="btn-del btn-muted" disabled>Ausgewählte löschen</button>
     </div>
   </div>
 </main>
@@ -240,6 +240,7 @@
   };
 
   undoBtn.onclick = async () => {
+    // Hier könntest du "lastDeleted" wiederherstellen, wenn du die Daten speicherst
     undoBtn.style.display = "none";
   };
 
