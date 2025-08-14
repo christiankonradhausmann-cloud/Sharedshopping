@@ -5,38 +5,90 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Shared Shopping</title>
 <style>
-  body { font-family: system-ui, sans-serif; margin: 0; padding: 0; background: #f4f4f4; }
-  header { background: #4CAF50; color: white; padding: 1rem; text-align: center; font-size: 1.5rem; }
-  main { padding: 1rem; max-width: 600px; margin: auto; }
-  .input-row { display: flex; gap: .5rem; margin-bottom: 1rem; align-items: center; }
-  input { padding: .5rem; border: 1px solid #ccc; border-radius: 4px; }
-  .btn { padding: .5rem .75rem; border: none; border-radius: 4px; cursor: pointer; }
+  body {
+    font-family: system-ui, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f4f4f4;
+  }
+  header {
+    background: #4CAF50;
+    color: white;
+    padding: 1rem;
+    text-align: center;
+    font-size: 1.5rem;
+  }
+  main {
+    padding: 1rem;
+    max-width: 600px;
+    margin: auto;
+  }
+  .input-row {
+    display: flex;
+    gap: .5rem;
+    margin-bottom: 1rem;
+    align-items: center;
+  }
+  input {
+    padding: .5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  .btn {
+    padding: .5rem .75rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
   .btn-add { background: #4CAF50; color: white; }
   .btn-del { background: #e74c3c; color: white; }
   .btn-secondary { background: #444; color: white; }
   .btn-muted { background: #bbb; color: #222; }
-  ul { list-style: none; padding: 0; margin: 0; }
-  li { background: white; padding: .5rem; border-radius: 4px; margin-bottom: .5rem;
-       display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .5rem; }
-  .item-text { display: flex; flex-direction: column; }
-  .bulk-bar { display: flex; justify-content: space-between; align-items: center;
-              margin-top: .75rem; flex-wrap: wrap; gap: .5rem; }
-  .bulk-left, .bulk-right { display: flex; align-items: center; gap: .5rem; }
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  li {
+    background: white;
+    padding: .5rem;
+    border-radius: 4px;
+    margin-bottom: .5rem;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: .5rem;
+  }
+  .item-text {
+    display: flex;
+    flex-direction: column;
+  }
+  .bulk-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: .75rem;
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+  .bulk-left, .bulk-right {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
   .hint { color: #777; font-size: .9rem; }
-
-  /* Toggle-Label Animation */
-  #toggleAllBtn { position: relative; overflow: hidden; }
-  #toggleAllBtn .label { display: inline-block; transition: opacity .18s ease, transform .18s ease; }
-  #toggleAllBtn.swap-out .label { opacity: 0; transform: translateY(-4px); }
-  #toggleAllBtn.swap-in  .label { opacity: 1; transform: translateY(0); }
-
   /* Auth Overlay */
-  #authGate { position: fixed; inset: 0; background: rgba(247,247,247,.98);
-              display: flex; align-items: center; justify-content: center; z-index: 9999; }
-  #authCard { background: #fff; border: 1px solid #ddd; border-radius: 10px;
-              width: min(420px, 92vw); padding: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.08);
-              font-family: system-ui, sans-serif; }
+  #authGate {
+    position: fixed; inset: 0; background: rgba(247,247,247,.98);
+    display: flex; align-items: center; justify-content: center; z-index: 9999;
+  }
+  #authCard {
+    background: #fff; border: 1px solid #ddd; border-radius: 10px;
+    width: min(420px, 92vw); padding: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    font-family: system-ui, sans-serif;
+  }
   #authCard input { width: 100%; padding: 10px; border:1px solid #ddd; border-radius: 8px; }
+  #authRow { display:flex; gap:8px; align-items:center; justify-content:space-between; margin-top:10px; }
   #rememberRow { display:flex; align-items:center; gap:8px; margin-top:8px; }
   #authBtn { background:#2ecc71; color:#fff; border:none; padding:10px 12px; border-radius:8px; cursor:pointer; }
   #authError { color:#e74c3c; font-size:.9rem; display:none; margin-top:8px; }
@@ -44,7 +96,6 @@
 </head>
 <body>
 
-<!-- Passwort-Gate -->
 <div id="authGate">
   <div id="authCard">
     <h2>🔒 Zugang</h2>
@@ -53,7 +104,9 @@
     <div id="rememberRow">
       <label><input id="rememberDevice" type="checkbox"> auf diesem Gerät merken</label>
     </div>
-    <button id="authBtn">Entsperren</button>
+    <div id="authRow">
+      <button id="authBtn">Entsperren</button>
+    </div>
     <div id="authError">Falsches Passwort.</div>
   </div>
 </div>
@@ -71,9 +124,7 @@
 
   <div class="bulk-bar">
     <div class="bulk-left">
-      <button id="toggleAllBtn" class="btn-secondary">
-        <span class="label">Alle auswählen</span>
-      </button>
+      <button id="toggleAllBtn" class="btn-secondary">Alle auswählen</button>
       <span id="selectionHint" class="hint">0 ausgewählt</span>
     </div>
     <div class="bulk-right">
@@ -85,7 +136,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBapD5LES4TOhhHjgX3664a7DnxC2043JU",
@@ -104,38 +155,12 @@
   const qtyInput = document.getElementById("qtyInput");
   const itemInput = document.getElementById("itemInput");
   const toggleAllBtn = document.getElementById("toggleAllBtn");
-  const toggleLabel = toggleAllBtn.querySelector(".label");
   const selectionHint = document.getElementById("selectionHint");
   const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
   const undoBtn = document.getElementById("undoBtn");
 
   let selectedIds = new Set();
   let lastDeleted = [];
-
-  function setToggleLabelAnimated(newText){
-    if (toggleLabel.textContent === newText) return;
-    toggleAllBtn.classList.remove("swap-in");
-    toggleAllBtn.classList.add("swap-out");
-    setTimeout(() => {
-      toggleLabel.textContent = newText;
-      toggleAllBtn.classList.remove("swap-out");
-      // Reflow, dann einblenden
-      void toggleAllBtn.offsetWidth;
-      toggleAllBtn.classList.add("swap-in");
-      setTimeout(()=>toggleAllBtn.classList.remove("swap-in"), 220);
-    }, 180);
-  }
-
-  function updateSelectionUI(totalCount) {
-    const count = selectedIds.size;
-    selectionHint.textContent = `${count} ausgewählt`;
-    deleteSelectedBtn.disabled = count === 0;
-
-    if (typeof totalCount === "number") {
-      const newText = (count === totalCount && totalCount > 0) ? "Auswahl aufheben" : "Alle auswählen";
-      setToggleLabelAnimated(newText);
-    }
-  }
 
   onSnapshot(collection(db, "items"), (snapshot) => {
     listEl.innerHTML = "";
@@ -149,7 +174,7 @@
       checkbox.onchange = () => {
         if (checkbox.checked) selectedIds.add(docSnap.id);
         else selectedIds.delete(docSnap.id);
-        updateSelectionUI(snapshot.size);
+        updateSelectionUI();
       };
 
       const textDiv = document.createElement("div");
@@ -159,7 +184,9 @@
       const delBtn = document.createElement("button");
       delBtn.textContent = "🗑";
       delBtn.className = "btn btn-del";
-      delBtn.onclick = async () => { await deleteDoc(doc(db, "items", docSnap.id)); };
+      delBtn.onclick = async () => {
+        await deleteDoc(doc(db, "items", docSnap.id));
+      };
 
       li.appendChild(checkbox);
       li.appendChild(textDiv);
@@ -167,7 +194,7 @@
 
       listEl.appendChild(li);
     });
-    updateSelectionUI(snapshot.size);
+    updateSelectionUI();
   });
 
   addBtn.onclick = async () => {
@@ -175,17 +202,30 @@
     const name = itemInput.value.trim();
     if (!name) return;
     await addDoc(collection(db, "items"), { qty, name });
-    qtyInput.value = ""; itemInput.value = "";
+    qtyInput.value = "";
+    itemInput.value = "";
   };
 
+  function updateSelectionUI() {
+    const count = selectedIds.size;
+    selectionHint.textContent = `${count} ausgewählt`;
+    deleteSelectedBtn.disabled = count === 0;
+  }
+
   toggleAllBtn.onclick = async () => {
-    const snap = await getDocs(collection(db, "items"));
+    const snap = await (await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js"))
+      .getDocs(collection(db, "items"));
     let total = 0, checked = 0;
     snap.forEach(d => { total++; if (selectedIds.has(d.id)) checked++; });
     const selectAll = checked !== total;
-    snap.forEach(d => { if (selectAll) selectedIds.add(d.id); else selectedIds.delete(d.id); });
-    document.querySelectorAll("#list input[type=checkbox]").forEach(cb => { cb.checked = selectAll; });
-    updateSelectionUI(total);
+    snap.forEach(d => {
+      if (selectAll) selectedIds.add(d.id);
+      else selectedIds.delete(d.id);
+    });
+    document.querySelectorAll("#list input[type=checkbox]").forEach(cb => {
+      cb.checked = selectAll;
+    });
+    updateSelectionUI();
   };
 
   deleteSelectedBtn.onclick = async () => {
@@ -203,8 +243,8 @@
     undoBtn.style.display = "none";
   };
 
-  // Passwortschutz (pepper)
-  const PASSWORD_SHA256_HEX = "0b14d501a594442a01c6859541bcb3e8164d183d32937b851835442f69d5c94e";
+  // Passwortschutz
+  const PASSWORD_SHA256_HEX = "0b14d501a594442a01c6859541bcb3e8164d183d32937b851835442f69d5c94e"; // "pepper"
   async function sha256Hex(str) {
     const enc = new TextEncoder().encode(str);
     const buf = await crypto.subtle.digest("SHA-256", enc);
