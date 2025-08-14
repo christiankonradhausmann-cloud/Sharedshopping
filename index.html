@@ -15,7 +15,7 @@
     }
     h1{text-align:center;margin:.2rem 0 1rem}
 
-    /* Eingabezeile – so skaliert's aufs iPhone */
+    /* Eingabezeile */
     .add-row{display:flex;align-items:center;margin-bottom:.75rem;gap:.5rem}
     .input-qty{flex:0 0 30%}
     .input-name{flex:0 0 55%}
@@ -36,18 +36,26 @@
     @keyframes pop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.2);opacity:1}100%{transform:scale(1)}}
     .disabled{opacity:.5;pointer-events:none}
 
-    /* Liste kompakt */
+    /* Liste */
     ul{list-style:none;padding:0;margin:0}
     li{
       background:var(--card);border:1px solid #ddd;border-radius:6px;
-      padding:.3rem .5rem;margin:.3rem 0;display:grid;grid-template-columns:auto 1fr auto;gap:.5rem;align-items:center
+      padding:.4rem .5rem;margin:.3rem 0;
+      display:grid;grid-template-columns:1fr auto;gap:.75rem;align-items:center
     }
-    .item-left{display:flex;align-items:center;gap:.5rem;min-width:0}
+    .item-left{
+      display:flex;align-items:flex-start;gap:.5rem;min-width:0;flex-wrap:wrap
+    }
     .qty{font-size:.85em;color:var(--muted)}
-    .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .controls{display:flex;align-items:center}
-    .visualizer{width:30px;height:18px;margin-right:6px}
+    .name{white-space:normal;word-break:break-word;flex:1}
     .editable{cursor:pointer}
+
+    /* Rechte Button-Gruppe */
+    .controls{
+      display:flex;align-items:center;gap:.4rem;justify-content:flex-end;
+      flex-wrap:nowrap
+    }
+    .visualizer{width:30px;height:18px}
 
     /* Bulk-Bar */
     .bulk-bar{
@@ -62,25 +70,24 @@
 <body>
   <h1>Shared Shopping 🛒</h1>
 
-  <!-- Eingabezeile -->
+  <!-- Eingabe -->
   <div class="add-row">
-    <input id="itemQty" class="input-qty" type="text" placeholder="Menge… (z. B. 5 / 500g / 300ml)" />
+    <input id="itemQty" class="input-qty" type="text" placeholder="Menge…" />
     <input id="itemName" class="input-name" type="text" placeholder="Artikel…" />
-    <button id="addBtn" class="btn-add disabled" title="Artikel hinzufügen">➕</button>
+    <button id="addBtn" class="btn-add disabled">➕</button>
   </div>
 
-  <!-- Liste -->
   <ul id="list"></ul>
 
   <!-- Bulk Actions -->
   <div class="bulk-bar">
     <div>
-      <button id="toggleAllBtn" class="btn-secondary" title="Alle auswählen / Auswahl aufheben">Alle auswählen</button>
+      <button id="toggleAllBtn" class="btn-secondary">Alle auswählen</button>
       <span id="selectionHint" class="hint">0 ausgewählt</span>
     </div>
     <div>
-      <button id="undoBtn" class="btn-secondary" style="display:none;" title="Letzten Löschvorgang rückgängig machen">↩ Rückgängig</button>
-      <button id="deleteSelectedBtn" class="btn-del btn-muted" disabled title="Ausgewählte Einträge löschen">Ausgewählte löschen</button>
+      <button id="undoBtn" class="btn-secondary" style="display:none;">↩ Rückgängig</button>
+      <button id="deleteSelectedBtn" class="btn-del btn-muted" disabled>Ausgewählte löschen</button>
     </div>
   </div>
 
@@ -92,7 +99,6 @@
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-storage.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
 
-    // 🔧 Deine Firebase Config (aus deinen letzten Daten)
     const firebaseConfig = {
       apiKey: "AIzaSyBapD5LES4TOhhHjgX3664a7DnxC2043JU",
       authDomain: "shoppinglist-66fa7.firebaseapp.com",
@@ -107,7 +113,6 @@
     const storage = getStorage(app);
     const auth = getAuth(app);
 
-    // UI-Refs
     const listEl = document.getElementById("list");
     const addBtn = document.getElementById("addBtn");
     const nameInput = document.getElementById("itemName");
@@ -117,11 +122,9 @@
     const undoBtn = document.getElementById("undoBtn");
     const selectionHint = document.getElementById("selectionHint");
 
-    // Auswahl & Undo
     const selectedIds = new Set();
-    let lastDeletedItems = []; // Array<{id,name,quantity,voiceUrl?}>
+    let lastDeletedItems = [];
 
-    // Auth
     let authReady = false;
     onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -132,7 +135,6 @@
       }
     });
 
-    // Add
     addBtn.onclick = async () => {
       if (!authReady) { alert("Warte auf Anmeldung..."); return; }
       const name = nameInput.value.trim();
@@ -142,7 +144,6 @@
       nameInput.value = ""; qtyInput.value = "";
     };
 
-    // Inline-Edit Helper
     function makeEditable(span, field, docRef){
       span.onclick = () => {
         const input = document.createElement("input");
@@ -161,7 +162,6 @@
       };
     }
 
-    // Render
     onSnapshot(collection(db, "items"), (snapshot) => {
       const currentIds = new Set();
       listEl.innerHTML = "";
@@ -173,7 +173,7 @@
 
         const li = document.createElement("li");
 
-        // linke Seite: Checkbox + (Menge) Name (beide editierbar)
+        // Linke Seite
         const left = document.createElement("div");
         left.className = "item-left";
 
@@ -196,18 +196,11 @@
         nameSpan.textContent = data.name || "";
         makeEditable(nameSpan, "name", docRef);
 
-        // Wrapper für "(Menge) Name"
-        const labelWrap = document.createElement("div");
-        labelWrap.style.display = "flex";
-        labelWrap.style.alignItems = "baseline";
-        labelWrap.style.gap = "6px";
-        labelWrap.appendChild(qtySpan);
-        labelWrap.appendChild(nameSpan);
-
-        left.appendChild(labelWrap);
+        left.appendChild(qtySpan);
+        left.appendChild(nameSpan);
         li.appendChild(left);
 
-        // rechte Seite: Visualizer + Voice + Play + Delete
+        // Rechte Seite (Buttons)
         const controls = document.createElement("div");
         controls.className = "controls";
 
@@ -240,20 +233,17 @@
         li.appendChild(controls);
         listEl.appendChild(li);
 
-        // Aufnahme-Logik + Visualizer
+        // Aufnahme-Logik
         let mediaRecorder = null, chunks = [], animationId = null, audioContext, analyser, source, dataArray;
 
         voiceBtn.onclick = async () => {
           if (!authReady) { alert("Warte auf Anmeldung..."); return; }
-
-          // Stoppen?
           if (mediaRecorder && mediaRecorder.state === "recording"){
             mediaRecorder.stop();
             cancelAnimationFrame(animationId);
             ctx.clearRect(0,0,canvas.width,canvas.height);
             return;
           }
-
           try{
             const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
             chunks = [];
@@ -267,25 +257,19 @@
               await uploadBytes(objectRef, blob, { contentType: blob.type || "audio/mp4" });
               const url = await getDownloadURL(objectRef);
               await updateDoc(docRef, { voiceUrl: url });
-
-              // Feedback
               voiceBtn.classList.add("saved");
               setTimeout(()=>voiceBtn.classList.remove("saved"), 1000);
-              // Play-Button grün + ✔
               playBtn.classList.remove("has-audio");
-              void playBtn.offsetWidth; // reflow to retrigger animation
+              void playBtn.offsetWidth;
               playBtn.classList.add("has-audio");
             };
             mediaRecorder.start();
-
-            // Visualizer
             audioContext = new AudioContext();
             analyser = audioContext.createAnalyser();
             source = audioContext.createMediaStreamSource(stream);
             source.connect(analyser);
             analyser.fftSize = 256;
             dataArray = new Uint8Array(analyser.frequencyBinCount);
-
             const draw = () => {
               animationId = requestAnimationFrame(draw);
               analyser.getByteFrequencyData(dataArray);
@@ -295,23 +279,16 @@
               ctx.fillRect(0, canvas.height - barH, canvas.width, barH);
             };
             draw();
-          }catch(err){
-            alert("Mikrofon nicht verfügbar: " + err.message);
-          }
+          }catch(err){ alert("Mikrofon nicht verfügbar: " + err.message); }
         };
       });
-
-      // Auswahl säubern (IDs, die es nicht mehr gibt, entfernen)
       [...selectedIds].forEach(id => { if (!currentIds.has(id)) selectedIds.delete(id); });
       updateSelectionUI();
     });
 
-    // Bulk: Ausgewählte löschen (mit Undo)
     deleteSelectedBtn.onclick = async () => {
       if (selectedIds.size === 0) return;
       if (!confirm(`${selectedIds.size} ausgewählte Einträge löschen?`)) return;
-
-      // Items puffern für Undo
       lastDeletedItems = [];
       const snap = await getDocs(collection(db, "items"));
       const toDelete = [];
@@ -322,17 +299,14 @@
         }
       });
       if (toDelete.length === 0) return;
-
       const batch = writeBatch(db);
       toDelete.forEach(id => batch.delete(doc(db,"items",id)));
       await batch.commit();
-
       selectedIds.clear();
       updateSelectionUI();
       if (lastDeletedItems.length > 0) undoBtn.style.display = "inline-block";
     };
 
-    // Alle auswählen / aufheben
     toggleAllBtn.onclick = async () => {
       const snap = await getDocs(collection(db, "items"));
       let total = 0, checked = 0;
@@ -342,12 +316,11 @@
       updateSelectionUI();
     };
 
-    // Undo
     undoBtn.onclick = async () => {
       if (lastDeletedItems.length === 0) return;
       for (const it of lastDeletedItems){
         const payload = { name: it.name || "", quantity: it.quantity || "" };
-        if (it.voiceUrl) payload.voiceUrl = it.voiceUrl; // verweist weiterhin auf alte Datei (ok)
+        if (it.voiceUrl) payload.voiceUrl = it.voiceUrl;
         await addDoc(collection(db, "items"), payload);
       }
       lastDeletedItems = [];
@@ -357,14 +330,11 @@
       alert("Auswahl wiederhergestellt.");
     };
 
-    // UI-Auswahlstatus
     function updateSelectionUI(){
       const count = selectedIds.size;
       selectionHint.textContent = `${count} ausgewählt`;
       deleteSelectedBtn.disabled = count === 0;
       deleteSelectedBtn.classList.toggle("btn-muted", count === 0);
-
-      // ToggleAll-Label
       const total = listEl.children.length;
       toggleAllBtn.textContent = (count > 0 && count === total) ? "Auswahl aufheben" : "Alle auswählen";
     }
