@@ -11,11 +11,12 @@
       --blue: #3498db;
       --bg: #f7f7f7;
       --card: #ffffff;
+      --muted: #888;
     }
     * { box-sizing: border-box; }
     body {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-      max-width: 460px;
+      max-width: 520px;
       margin: auto;
       padding: 1rem;
       background: var(--bg);
@@ -25,12 +26,13 @@
       text-align: center;
       margin: 0 0 1rem 0;
     }
+
     .row {
       display: flex;
       gap: .5rem;
       margin-bottom: .75rem;
     }
-    input {
+    input[type="text"] {
       flex: 1;
       padding: .6rem .7rem;
       border-radius: 8px;
@@ -38,6 +40,7 @@
       background: #fff;
       font-size: 1rem;
     }
+
     button {
       border: none;
       color: #fff;
@@ -48,16 +51,12 @@
       font-size: 1rem;
     }
     .btn-add { background: var(--green); }
-    .btn-clear {
-      background: var(--red);
-      margin-top: 1rem;
-      float: right;
-    }
-    .btn-undo {
-      background: var(--blue);
-      margin-top: 1rem;
-      float: left;
-    }
+    .btn-del { background: var(--red); padding: .4rem .55rem; border-radius: 8px; min-width: 2.2rem; text-align: center; }
+    .btn-clear { background: var(--red); }
+    .btn-undo { background: var(--blue); }
+    .btn-secondary { background: #444; }
+    .btn-muted { background: #bbb; color: #222; }
+
     ul {
       list-style: none;
       padding: 0;
@@ -68,9 +67,10 @@
     li {
       background: var(--card);
       padding: .6rem .7rem;
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
       align-items: center;
+      gap: .6rem;
       border-radius: 8px;
       border: 1px solid #eee;
     }
@@ -78,30 +78,50 @@
       overflow: hidden;
       white-space: nowrap;
       text-overflow: ellipsis;
-      padding-right: .75rem;
+      padding-right: .25rem;
     }
-    .btn-del {
-      background: var(--red);
-      padding: .4rem .55rem;
-      border-radius: 8px;
-      min-width: 2.2rem;
-      text-align: center;
+    .tools {
+      display: flex;
+      gap: .4rem;
     }
+
+    .bulk-bar {
+      display: flex;
+      gap: .5rem;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    .bulk-left, .bulk-right {
+      display: flex; gap: .5rem; align-items: center;
+    }
+    .hint { color: var(--muted); font-size: .9rem; }
   </style>
 </head>
 <body>
   <h1>Shared Shopping 🛒</h1>
 
+  <!-- Eingabezeile -->
   <div class="row">
     <input id="itemInput" type="text" placeholder="Neuer Artikel …" />
     <button id="addBtn" class="btn-add" title="Artikel hinzufügen">➕</button>
   </div>
 
+  <!-- Liste -->
   <ul id="list"></ul>
 
-  <div>
-    <button id="undoBtn" class="btn-undo" title="Letzten Löschvorgang rückgängig machen" style="display:none;">↩ Rückgängig</button>
-    <button id="clearAllBtn" class="btn-clear" title="Alle Einträge löschen">Alles löschen</button>
+  <!-- Bulk-Actions unten -->
+  <div class="bulk-bar">
+    <div class="bulk-left">
+      <button id="toggleAllBtn" class="btn-secondary" title="Alle auswählen / Auswahl aufheben">Alle auswählen</button>
+      <span id="selectionHint" class="hint">0 ausgewählt</span>
+    </div>
+    <div class="bulk-right">
+      <button id="undoBtn" class="btn-undo" style="display:none;" title="Letzten Löschvorgang rückgängig machen">↩ Rückgängig</button>
+      <button id="deleteSelectedBtn" class="btn-del btn-muted" disabled title="Ausgewählte Einträge löschen">Ausgewählte löschen</button>
+      <button id="clearAllBtn" class="btn-clear" title="Alle Einträge löschen">Alles löschen</button>
+    </div>
   </div>
 
   <script type="module">
@@ -111,6 +131,7 @@
       getDocs, writeBatch
     } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
 
+    // 🔹 Deine Firebase-Konfiguration
     const firebaseConfig = {
       apiKey: "AIzaSyBpdSLE4T0HhHj9x3664a7DnxC2043JU",
       authDomain: "shoppinglist-66fa7.firebaseapp.com",
@@ -123,36 +144,71 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // DOM-Refs
     const listEl = document.getElementById("list");
     const itemInput = document.getElementById("itemInput");
     const addBtn = document.getElementById("addBtn");
     const clearAllBtn = document.getElementById("clearAllBtn");
     const undoBtn = document.getElementById("undoBtn");
+    const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
+    const toggleAllBtn = document.getElementById("toggleAllBtn");
+    const selectionHint = document.getElementById("selectionHint");
 
-    let lastDeletedItems = [];
+    // Auswahl-Status zwischenspeichern, damit Häkchen bei Live-Updates erhalten bleiben
+    const selectedIds = new Set();
+    let lastDeletedItems = []; // für Undo (Bulk oder Alles‑löschen)
 
+    // Render via Echtzeit-Listener
     onSnapshot(collection(db, "items"), (snapshot) => {
+      // Map mit aktuellen IDs, um alte Auswahl zu säubern
+      const currentIds = new Set();
       listEl.innerHTML = "";
+
       snapshot.forEach((docSnap) => {
+        const id = docSnap.id;
+        currentIds.add(id);
         const data = docSnap.data();
+
         const li = document.createElement("li");
 
+        // Checkbox
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = selectedIds.has(id);
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) selectedIds.add(id);
+          else selectedIds.delete(id);
+          updateSelectionUI();
+        });
+
+        // Name
         const name = document.createElement("span");
         name.className = "item-name";
         name.textContent = data.name;
 
+        // Einzel-Löschen
         const delBtn = document.createElement("button");
         delBtn.className = "btn-del";
         delBtn.textContent = "🗑";
         delBtn.title = "Eintrag löschen";
-        delBtn.onclick = () => deleteDoc(doc(db, "items", docSnap.id));
+        delBtn.onclick = () => deleteDoc(doc(db, "items", id));
 
+        const tools = document.createElement("div");
+        tools.className = "tools";
+        tools.appendChild(delBtn);
+
+        li.appendChild(checkbox);
         li.appendChild(name);
-        li.appendChild(delBtn);
+        li.appendChild(tools);
         listEl.appendChild(li);
       });
+
+      // Auswahl auf nicht mehr existierende IDs aufräumen
+      [...selectedIds].forEach(id => { if (!currentIds.has(id)) selectedIds.delete(id); });
+      updateSelectionUI();
     });
 
+    // Hinzufügen
     async function addItem() {
       const name = itemInput.value.trim();
       if (!name) return;
@@ -161,39 +217,97 @@
       itemInput.focus();
     }
 
+    // Alles löschen (mit Undo)
     async function clearAll() {
       if (!confirm("Wirklich alle Einträge löschen?")) return;
       const itemsRef = collection(db, "items");
       const snap = await getDocs(itemsRef);
       if (snap.empty) return;
 
-      // Speichern, um rückgängig machen zu können
       lastDeletedItems = [];
-      snap.forEach(d => lastDeletedItems.push(d.data()));
+      snap.forEach(d => lastDeletedItems.push({ id: d.id, ...d.data() }));
 
       const batch = writeBatch(db);
       snap.forEach(d => batch.delete(doc(db, "items", d.id)));
       await batch.commit();
 
-      if (lastDeletedItems.length > 0) {
-        undoBtn.style.display = "inline-block";
-      }
+      // Auswahl zurücksetzen, Undo anbieten
+      selectedIds.clear();
+      updateSelectionUI();
+      if (lastDeletedItems.length > 0) undoBtn.style.display = "inline-block";
     }
 
+    // Ausgewählte löschen (mit Undo)
+    async function deleteSelected() {
+      if (selectedIds.size === 0) return;
+      if (!confirm(`${selectedIds.size} ausgewählte Einträge löschen?`)) return;
+
+      // Zu löschende Items für Undo puffern
+      lastDeletedItems = [];
+      // Wir lesen die Items einmal, um die Namen zu sichern
+      const snap = await getDocs(collection(db, "items"));
+      const toDelete = [];
+      snap.forEach(d => { if (selectedIds.has(d.id)) { lastDeletedItems.push({ id: d.id, ...d.data() }); toDelete.push(d.id); }});
+      if (toDelete.length === 0) return;
+
+      const batch = writeBatch(db);
+      toDelete.forEach(id => batch.delete(doc(db, "items", id)));
+      await batch.commit();
+
+      selectedIds.clear();
+      updateSelectionUI();
+      if (lastDeletedItems.length > 0) undoBtn.style.display = "inline-block";
+    }
+
+    // „Alle auswählen“ / „Auswahl aufheben“
+    async function toggleSelectAll() {
+      // Wenn bereits alle ausgewählt sind → abwählen, sonst alle auswählen
+      const snap = await getDocs(collection(db, "items"));
+      let total = 0, checked = 0;
+      snap.forEach(d => {
+        total++;
+        if (selectedIds.has(d.id)) checked++;
+      });
+
+      const selectAll = checked !== total; // true, wenn nicht alle markiert sind
+      snap.forEach(d => {
+        if (selectAll) selectedIds.add(d.id);
+        else selectedIds.delete(d.id);
+      });
+      updateSelectionUI();
+    }
+
+    // Undo (stellt letzte Lösch-Operation wieder her)
     async function undoDelete() {
       if (lastDeletedItems.length === 0) return;
+      // Inhalte wieder hinzufügen (IDs werden neu generiert – für unsere Liste egal)
       for (const item of lastDeletedItems) {
-        await addDoc(collection(db, "items"), item);
+        await addDoc(collection(db, "items"), { name: item.name });
       }
       lastDeletedItems = [];
       undoBtn.style.display = "none";
+      // Auswahl bleibt leer
+      selectedIds.clear();
+      updateSelectionUI();
+      alert("Auswahl wiederhergestellt.");
     }
 
+    // UI-Status der Auswahl aktualisieren
+    function updateSelectionUI() {
+      const count = selectedIds.size;
+      selectionHint.textContent = `${count} ausgewählt`;
+      deleteSelectedBtn.disabled = count === 0;
+      deleteSelectedBtn.classList.toggle("btn-muted", count === 0);
+      toggleAllBtn.textContent = (count > 0 && count === listEl.children.length && count !== 0)
+        ? "Auswahl aufheben" : "Alle auswählen";
+    }
+
+    // Events
     addBtn.addEventListener("click", addItem);
-    itemInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") addItem();
-    });
+    itemInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addItem(); });
     clearAllBtn.addEventListener("click", clearAll);
+    deleteSelectedBtn.addEventListener("click", deleteSelected);
+    toggleAllBtn.addEventListener("click", toggleSelectAll);
     undoBtn.addEventListener("click", undoDelete);
   </script>
 </body>
