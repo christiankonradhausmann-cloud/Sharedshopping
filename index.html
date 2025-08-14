@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Einkaufsliste</title>
+  <title>Shared Shopping</title>
   <style>
     :root {
       --green: #2ecc71;
@@ -19,20 +19,10 @@
       padding: 1rem;
       background: var(--bg);
     }
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: .5rem;
-      margin-bottom: 1rem;
-    }
     h1 {
-      font-size: 1.4rem;
-      margin: 0;
-    }
-    .actions {
-      display: flex;
-      gap: .5rem;
+      font-size: 1.6rem;
+      text-align: center;
+      margin: 0 0 1rem 0;
     }
     .row {
       display: flex;
@@ -57,7 +47,11 @@
       font-size: 1rem;
     }
     .btn-add { background: var(--green); }
-    .btn-clear { background: var(--red); }
+    .btn-clear {
+      background: var(--red);
+      margin-top: 1rem;
+      float: right;
+    }
     ul {
       list-style: none;
       padding: 0;
@@ -90,12 +84,7 @@
   </style>
 </head>
 <body>
-  <header>
-    <h1>SharedShopping 🐕‍🦺🛒</h1>
-    <div class="actions">
-      <button id="clearAllBtn" class="btn-clear" title="Alle Einträge löschen">Alles löschen</button>
-    </div>
-  </header>
+  <h1>SharedShopping 🛒</h1>
 
   <div class="row">
     <input id="itemInput" type="text" placeholder="Neuer Artikel …" />
@@ -104,15 +93,15 @@
 
   <ul id="list"></ul>
 
+  <button id="clearAllBtn" class="btn-clear" title="Alle Einträge löschen">Alles löschen</button>
+
   <script type="module">
-    // Firebase SDKs laden
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
     import {
       getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc,
       getDocs, writeBatch
     } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
 
-    // 🔹 Deine Firebase-Konfiguration (ggf. anpassen, falls du sie geändert hast)
     const firebaseConfig = {
       apiKey: "AIzaSyBpdSLE4T0HhHj9x3664a7DnxC2043JU",
       authDomain: "shoppinglist-66fa7.firebaseapp.com",
@@ -122,17 +111,14 @@
       appId: "1:53181558287:web:22e89caC4fde099361c10a"
     };
 
-    // Firebase & Firestore initialisieren
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // DOM-Refs
     const listEl = document.getElementById("list");
     const itemInput = document.getElementById("itemInput");
     const addBtn = document.getElementById("addBtn");
     const clearAllBtn = document.getElementById("clearAllBtn");
 
-    // 🔹 Echtzeit-Listener für alle Items
     onSnapshot(collection(db, "items"), (snapshot) => {
       listEl.innerHTML = "";
       snapshot.forEach((docSnap) => {
@@ -155,7 +141,6 @@
       });
     });
 
-    // 🔹 Einzelnes Item hinzufügen
     async function addItem() {
       const name = itemInput.value.trim();
       if (!name) return;
@@ -164,7 +149,6 @@
       itemInput.focus();
     }
 
-    // 🔹 Alle Items löschen (mit Sicherheitsabfrage & Batch)
     async function clearAll() {
       if (!confirm("Wirklich alle Einträge löschen?")) return;
       const itemsRef = collection(db, "items");
@@ -176,7 +160,6 @@
       await batch.commit();
     }
 
-    // Events
     addBtn.addEventListener("click", addItem);
     itemInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") addItem();
