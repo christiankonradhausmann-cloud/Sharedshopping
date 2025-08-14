@@ -17,14 +17,18 @@
 
     /* Eingabezeile */
     .add-row{display:flex;align-items:center;margin-bottom:.75rem;gap:.5rem}
-    .input-qty{flex:0 0 30%}
-    .input-name{flex:0 0 55%}
-    .btn-add{flex:0 0 15%}
+    .input-qty{flex:0 0 25%}
+    .input-name{flex:0 0 50%}
+    .btn-add{flex:0 0 25%}
 
-    input[type="text"]{padding:.45rem .5rem;border:1px solid #ddd;border-radius:6px}
+    input[type="text"]{
+      padding:.35rem .4rem;border:1px solid #ddd;border-radius:6px;
+      font-size:.9rem
+    }
     button{
       border:none;border-radius:6px;color:#fff;cursor:pointer;
-      padding:.45rem .6rem;display:flex;align-items:center;gap:4px
+      padding:.35rem .4rem;display:flex;align-items:center;gap:4px;
+      font-size:.9rem
     }
     .btn-add{background:var(--green)}
     .btn-del{background:var(--red)}
@@ -40,22 +44,29 @@
     ul{list-style:none;padding:0;margin:0}
     li{
       background:var(--card);border:1px solid #ddd;border-radius:6px;
-      padding:.4rem .5rem;margin:.3rem 0;
-      display:grid;grid-template-columns:1fr auto;gap:.75rem;align-items:center
+      padding:.35rem .4rem;margin:.3rem 0;
+      display:grid;grid-template-columns:auto 1fr auto;gap:.5rem;align-items:center
     }
     .item-left{
-      display:flex;align-items:flex-start;gap:.5rem;min-width:0;flex-wrap:wrap
+      display:flex;align-items:center;gap:.5rem;min-width:0;
     }
-    .qty{font-size:.85em;color:var(--muted)}
-    .name{white-space:normal;word-break:break-word;flex:1}
+    .cb-small{
+      width:16px;height:16px
+    }
+    .text-block{
+      display:flex;flex-direction:column;min-width:0
+    }
+    .qty{font-size:.8em;color:var(--muted)}
+    .name{white-space:normal;word-break:break-word}
     .editable{cursor:pointer}
 
     /* Rechte Button-Gruppe */
     .controls{
-      display:flex;align-items:center;gap:.4rem;justify-content:flex-end;
+      display:flex;align-items:center;gap:.3rem;justify-content:flex-end;
       flex-wrap:nowrap
     }
-    .visualizer{width:30px;height:18px}
+    .controls button{padding:.3rem .35rem;font-size:.85rem}
+    .visualizer{width:24px;height:14px}
 
     /* Bulk-Bar */
     .bulk-bar{
@@ -173,18 +184,20 @@
 
         const li = document.createElement("li");
 
-        // Linke Seite
-        const left = document.createElement("div");
-        left.className = "item-left";
-
+        // Checkbox
         const cb = document.createElement("input");
         cb.type = "checkbox";
+        cb.className = "cb-small";
         cb.checked = selectedIds.has(id);
         cb.onchange = () => {
           if (cb.checked) selectedIds.add(id); else selectedIds.delete(id);
           updateSelectionUI();
         };
-        left.appendChild(cb);
+        li.appendChild(cb);
+
+        // Textblock mit Menge + Name
+        const textBlock = document.createElement("div");
+        textBlock.className = "text-block";
 
         const qtySpan = document.createElement("span");
         qtySpan.className = "qty editable";
@@ -196,9 +209,9 @@
         nameSpan.textContent = data.name || "";
         makeEditable(nameSpan, "name", docRef);
 
-        left.appendChild(qtySpan);
-        left.appendChild(nameSpan);
-        li.appendChild(left);
+        textBlock.appendChild(qtySpan);
+        textBlock.appendChild(nameSpan);
+        li.appendChild(textBlock);
 
         // Rechte Seite (Buttons)
         const controls = document.createElement("div");
