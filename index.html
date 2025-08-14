@@ -15,7 +15,24 @@
     }
     h1{text-align:center;margin:.2rem 0 1rem}
 
-    /* Eingabezeile */
+    /* ===== Passwort-Gate (Overlay) ===== */
+    #authGate {
+      position: fixed; inset: 0; background: rgba(247,247,247,.98);
+      display: flex; align-items: center; justify-content: center; z-index: 9999;
+    }
+    #authCard {
+      background: #fff; border:1px solid #ddd; border-radius: 10px;
+      width: min(420px, 92vw); padding: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.08);
+      font-family: system-ui, sans-serif;
+    }
+    #authCard h2 { margin: 0 0 8px; }
+    #authCard input { width: 100%; padding: 10px; border:1px solid #ddd; border-radius: 8px; }
+    #rememberRow { display:flex; align-items:center; gap:8px; margin-top:8px; }
+    #authRow { display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-top:10px; }
+    #authBtn { background:#2ecc71; color:#fff; border:none; padding:10px 12px; border-radius:8px; cursor:pointer; }
+    #authError { color:#e74c3c; font-size:.9rem; display:none; margin-top:8px; }
+
+    /* ===== Eingabezeile ===== */
     .add-row{display:flex;align-items:center;margin-bottom:.75rem;gap:.5rem}
     .input-qty, .input-name{
       border:1px solid #ddd;border-radius:6px;padding:.35rem .4rem;
@@ -38,7 +55,7 @@
     @keyframes pop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.2);opacity:1}100%{transform:scale(1)}}
     .disabled{opacity:.5;pointer-events:none}
 
-    /* Liste */
+    /* ===== Liste ===== */
     ul{list-style:none;padding:0;margin:0}
     li{
       background:var(--card);border:1px solid #ddd;border-radius:6px;
@@ -62,7 +79,7 @@
     .controls button{padding:.3rem .35rem;font-size:.85rem}
     .visualizer{width:24px;height:14px}
 
-    /* Bulk-Bar */
+    /* ===== Bulk-Bar ===== */
     .bulk-bar{
       display:flex;justify-content:space-between;align-items:center;
       margin-top:.75rem;flex-wrap:wrap;gap:.5rem
@@ -74,6 +91,22 @@
 </head>
 <body>
   <h1>Shared Shopping 🛒</h1>
+
+  <!-- Passwort-Gate -->
+  <div id="authGate">
+    <div id="authCard">
+      <h2>🔒 Zugang</h2>
+      <p>Bitte Passwort eingeben, um die Liste zu öffnen.</p>
+      <input id="pwInput" type="password" placeholder="Passwort" autocomplete="current-password" />
+      <div id="rememberRow">
+        <label><input id="rememberDevice" type="checkbox"> auf diesem Gerät merken</label>
+      </div>
+      <div id="authRow">
+        <button id="authBtn">Entsperren</button>
+      </div>
+      <div id="authError">Falsches Passwort.</div>
+    </div>
+  </div>
 
   <!-- Eingabe -->
   <div class="add-row">
@@ -96,6 +129,7 @@
     </div>
   </div>
 
+  <!-- App-Logik -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
     import {
@@ -130,7 +164,34 @@
     const selectedIds = new Set();
     let lastDeletedItems = [];
 
-    // Auto-Breite für Eingabefelder
+    /* ===== Passwort-Gate Logik ===== */
+    // SHA-256("pepper")
+    const PASSWORD_SHA256_HEX = "8cbbcf29d9cef89675c5f5c1dcfe827d0570416a5aaba30dd0de159661ad905b";
+    async function sha256Hex(str){
+      const enc = new TextEncoder().encode(str);
+      const buf = await crypto.subtle.digest("SHA-256", enc);
+      return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
+    }
+    const gate = document.getElementById("authGate");
+    const authBtn = document.getElementById("authBtn");
+    const pwInput = document.getElementById("pwInput");
+    const authErr = document.getElementById("authError");
+    const remember = document.getElementById("rememberDevice");
+    if (localStorage.getItem("sharedShoppingUnlocked") === "yes") gate.style.display = "none";
+    authBtn.onclick = async () => {
+      authErr.style.display = "none";
+      const hash = await sha256Hex(pwInput.value || "");
+      if (hash === PASSWORD_SHA256_HEX){
+        if (remember.checked) localStorage.setItem("sharedShoppingUnlocked","yes");
+        gate.style.display = "none";
+      } else {
+        authErr.style.display = "block";
+        pwInput.select();
+      }
+    };
+    pwInput.addEventListener("keydown", e => { if (e.key === "Enter") authBtn.click(); });
+
+    /* ===== Auto-Breite für Eingabefelder ===== */
     function autoResizeInput(el, placeholder) {
       const testSpan = document.createElement("span");
       testSpan.style.visibility = "hidden";
@@ -140,22 +201,19 @@
         testSpan.textContent = el.value || placeholder;
         el.style.width = testSpan.offsetWidth + 12 + "px";
       }
-      el.addEventListener("input", resize);
-      resize();
+      el.addEventListener("input", resize); resize();
     }
     autoResizeInput(qtyInput, "Menge");
     autoResizeInput(nameInput, "Artikel");
 
+    /* ===== Auth (anonym) für Storage/Firestore ===== */
     let authReady = false;
     onAuthStateChanged(auth, (user) => {
-      if (user) {
-        authReady = true;
-        addBtn.classList.remove("disabled");
-      } else {
-        signInAnonymously(auth).catch(e => alert("Auth-Fehler: " + e.message));
-      }
+      if (user) { authReady = true; addBtn.classList.remove("disabled"); }
+      else { signInAnonymously(auth).catch(e => alert("Auth-Fehler: " + e.message)); }
     });
 
+    /* ===== Hinzufügen ===== */
     addBtn.onclick = async () => {
       if (!authReady) { alert("Warte auf Anmeldung..."); return; }
       const name = nameInput.value.trim();
@@ -167,6 +225,7 @@
       qtyInput.dispatchEvent(new Event("input"));
     };
 
+    /* ===== Inline-Edit ===== */
     function makeEditable(span, field, docRef){
       span.onclick = () => {
         const input = document.createElement("input");
@@ -185,6 +244,7 @@
       };
     }
 
+    /* ===== Render + Aufnahme/Audio ===== */
     onSnapshot(collection(db, "items"), (snapshot) => {
       const currentIds = new Set();
       listEl.innerHTML = "";
@@ -197,13 +257,9 @@
 
         // Checkbox
         const cb = document.createElement("input");
-        cb.type = "checkbox";
-        cb.className = "cb-small";
+        cb.type = "checkbox"; cb.className = "cb-small";
         cb.checked = selectedIds.has(id);
-        cb.onchange = () => {
-          if (cb.checked) selectedIds.add(id); else selectedIds.delete(id);
-          updateSelectionUI();
-        };
+        cb.onchange = () => { if (cb.checked) selectedIds.add(id); else selectedIds.delete(id); updateSelectionUI(); };
         li.appendChild(cb);
 
         // Textblock
@@ -213,12 +269,10 @@
         qtySpan.className = "qty editable";
         qtySpan.textContent = data.quantity || "";
         makeEditable(qtySpan, "quantity", docRef);
-
         const nameSpan = document.createElement("span");
         nameSpan.className = "name editable";
         nameSpan.textContent = data.name || "";
         makeEditable(nameSpan, "name", docRef);
-
         textBlock.appendChild(qtySpan);
         textBlock.appendChild(nameSpan);
         li.appendChild(textBlock);
@@ -226,33 +280,25 @@
         // Buttons
         const controls = document.createElement("div");
         controls.className = "controls";
-
         const canvas = document.createElement("canvas");
         canvas.className = "visualizer";
         const ctx = canvas.getContext("2d");
         controls.appendChild(canvas);
-
         const voiceBtn = document.createElement("button");
         voiceBtn.textContent = "🎙";
         voiceBtn.className = "btn-voice" + (authReady ? "" : " disabled");
         controls.appendChild(voiceBtn);
-
         const playBtn = document.createElement("button");
         playBtn.textContent = "🔊";
         playBtn.className = "btn-play";
         if (data.voiceUrl) playBtn.classList.add("has-audio");
-        playBtn.onclick = () => {
-          if (data.voiceUrl) new Audio(data.voiceUrl).play();
-          else alert("Keine Sprachnotiz vorhanden.");
-        };
+        playBtn.onclick = () => { if (data.voiceUrl) new Audio(data.voiceUrl).play(); else alert("Keine Sprachnotiz vorhanden."); };
         controls.appendChild(playBtn);
-
         const delBtn = document.createElement("button");
         delBtn.textContent = "🗑";
         delBtn.className = "btn-del";
         delBtn.onclick = () => deleteDoc(docRef);
         controls.appendChild(delBtn);
-
         li.appendChild(controls);
         listEl.appendChild(li);
 
@@ -261,15 +307,11 @@
         voiceBtn.onclick = async () => {
           if (!authReady) { alert("Warte auf Anmeldung..."); return; }
           if (mediaRecorder && mediaRecorder.state === "recording"){
-            mediaRecorder.stop();
-            cancelAnimationFrame(animationId);
-            ctx.clearRect(0,0,canvas.width,canvas.height);
-            return;
+            mediaRecorder.stop(); cancelAnimationFrame(animationId); ctx.clearRect(0,0,canvas.width,canvas.height); return;
           }
           try{
             const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
-            chunks = [];
-            mediaRecorder = new MediaRecorder(stream);
+            chunks = []; mediaRecorder = new MediaRecorder(stream);
             mediaRecorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
             mediaRecorder.onstop = async () => {
               stream.getTracks().forEach(t=>t.stop());
@@ -279,28 +321,18 @@
               await uploadBytes(objectRef, blob, { contentType: blob.type || "audio/mp4" });
               const url = await getDownloadURL(objectRef);
               await updateDoc(docRef, { voiceUrl: url });
-              voiceBtn.classList.add("saved");
-              setTimeout(()=>voiceBtn.classList.remove("saved"), 1000);
-              playBtn.classList.remove("has-audio");
-              void playBtn.offsetWidth;
-              playBtn.classList.add("has-audio");
+              voiceBtn.classList.add("saved"); setTimeout(()=>voiceBtn.classList.remove("saved"), 1000);
+              playBtn.classList.remove("has-audio"); void playBtn.offsetWidth; playBtn.classList.add("has-audio");
             };
             mediaRecorder.start();
-            audioContext = new AudioContext();
-            analyser = audioContext.createAnalyser();
-            source = audioContext.createMediaStreamSource(stream);
-            source.connect(analyser);
-            analyser.fftSize = 256;
-            dataArray = new Uint8Array(analyser.frequencyBinCount);
-            const draw = () => {
-              animationId = requestAnimationFrame(draw);
-              analyser.getByteFrequencyData(dataArray);
-              ctx.clearRect(0,0,canvas.width,canvas.height);
-              ctx.fillStyle = "#3498db";
-              const barH = Math.max(...dataArray)/2;
+            audioContext = new AudioContext(); analyser = audioContext.createAnalyser();
+            source = audioContext.createMediaStreamSource(stream); source.connect(analyser);
+            analyser.fftSize = 256; dataArray = new Uint8Array(analyser.frequencyBinCount);
+            const draw = () => { animationId = requestAnimationFrame(draw);
+              analyser.getByteFrequencyData(dataArray); ctx.clearRect(0,0,canvas.width,canvas.height);
+              ctx.fillStyle = "#3498db"; const barH = Math.max(...dataArray)/2;
               ctx.fillRect(0, canvas.height - barH, canvas.width, barH);
-            };
-            draw();
+            }; draw();
           }catch(err){ alert("Mikrofon nicht verfügbar: " + err.message); }
         };
       });
@@ -308,46 +340,28 @@
       updateSelectionUI();
     });
 
+    /* ===== Bulk-Actions ===== */
     deleteSelectedBtn.onclick = async () => {
       if (selectedIds.size === 0) return;
       if (!confirm(`${selectedIds.size} ausgewählte Einträge löschen?`)) return;
       lastDeletedItems = [];
       const snap = await getDocs(collection(db, "items"));
       const toDelete = [];
-      snap.forEach(d => {
-        if (selectedIds.has(d.id)){
-          lastDeletedItems.push({ id: d.id, ...d.data() });
-          toDelete.push(d.id);
-        }
-      });
+      snap.forEach(d => { if (selectedIds.has(d.id)){ lastDeletedItems.push({ id: d.id, ...d.data() }); toDelete.push(d.id); } });
       if (toDelete.length === 0) return;
-      const batch = writeBatch(db);
-      toDelete.forEach(id => batch.delete(doc(db,"items",id)));
-      await batch.commit();
-      selectedIds.clear();
-      updateSelectionUI();
-      if (lastDeletedItems.length > 0) undoBtn.style.display = "inline-block";
+      const batch = writeBatch(db); toDelete.forEach(id => batch.delete(doc(db,"items",id)));
+      await batch.commit(); selectedIds.clear(); updateSelectionUI();
+      if (lastDeletedItems.length > 0) document.getElementById("undoBtn").style.display = "inline-block";
     };
 
     toggleAllBtn.onclick = async () => {
       const snap = await getDocs(collection(db, "items"));
       let total = 0, checked = 0;
       snap.forEach(d => { total++; if (selectedIds.has(d.id)) checked++; });
-
       const selectAll = checked !== total;
-      snap.forEach(d => {
-        if (selectAll) {
-          selectedIds.add(d.id);
-        } else {
-          selectedIds.delete(d.id);
-        }
-      });
-
-      // DOM-Checkboxen anpassen
-      document.querySelectorAll(".cb-small").forEach(cb => {
-        cb.checked = selectAll;
-      });
-
+      snap.forEach(d => { if (selectAll) selectedIds.add(d.id); else selectedIds.delete(d.id); });
+      // Checkboxen im DOM spiegeln
+      document.querySelectorAll(".cb-small").forEach(cb => { cb.checked = selectAll; });
       updateSelectionUI();
     };
 
@@ -358,10 +372,7 @@
         if (it.voiceUrl) payload.voiceUrl = it.voiceUrl;
         await addDoc(collection(db, "items"), payload);
       }
-      lastDeletedItems = [];
-      undoBtn.style.display = "none";
-      selectedIds.clear();
-      updateSelectionUI();
+      lastDeletedItems = []; undoBtn.style.display = "none"; selectedIds.clear(); updateSelectionUI();
       alert("Auswahl wiederhergestellt.");
     };
 
