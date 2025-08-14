@@ -17,14 +17,12 @@
 
     /* Eingabezeile */
     .add-row{display:flex;align-items:center;margin-bottom:.75rem;gap:.5rem}
-    .input-qty{flex:0 0 25%}
-    .input-name{flex:0 0 50%}
-    .btn-add{flex:0 0 25%}
-
-    input[type="text"]{
-      padding:.35rem .4rem;border:1px solid #ddd;border-radius:6px;
-      font-size:.9rem
+    .input-qty, .input-name{
+      border:1px solid #ddd;border-radius:6px;padding:.35rem .4rem;
+      font-size:.9rem;min-width:3ch;width:auto;box-sizing:content-box;
     }
+    .btn-add{flex:0 0 auto}
+
     button{
       border:none;border-radius:6px;color:#fff;cursor:pointer;
       padding:.35rem .4rem;display:flex;align-items:center;gap:4px;
@@ -50,12 +48,8 @@
     .item-left{
       display:flex;align-items:center;gap:.5rem;min-width:0;
     }
-    .cb-small{
-      width:16px;height:16px
-    }
-    .text-block{
-      display:flex;flex-direction:column;min-width:0
-    }
+    .cb-small{width:16px;height:16px}
+    .text-block{display:flex;flex-direction:column;min-width:0}
     .qty{font-size:.8em;color:var(--muted)}
     .name{white-space:normal;word-break:break-word}
     .editable{cursor:pointer}
@@ -83,8 +77,8 @@
 
   <!-- Eingabe -->
   <div class="add-row">
-    <input id="itemQty" class="input-qty" type="text" placeholder="Menge…" />
-    <input id="itemName" class="input-name" type="text" placeholder="Artikel…" />
+    <input id="itemQty" class="input-qty" type="text" placeholder="Menge" />
+    <input id="itemName" class="input-name" type="text" placeholder="Artikel" />
     <button id="addBtn" class="btn-add disabled">➕</button>
   </div>
 
@@ -124,10 +118,10 @@
     const storage = getStorage(app);
     const auth = getAuth(app);
 
-    const listEl = document.getElementById("list");
-    const addBtn = document.getElementById("addBtn");
-    const nameInput = document.getElementById("itemName");
     const qtyInput = document.getElementById("itemQty");
+    const nameInput = document.getElementById("itemName");
+    const addBtn = document.getElementById("addBtn");
+    const listEl = document.getElementById("list");
     const toggleAllBtn = document.getElementById("toggleAllBtn");
     const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
     const undoBtn = document.getElementById("undoBtn");
@@ -135,6 +129,22 @@
 
     const selectedIds = new Set();
     let lastDeletedItems = [];
+
+    // Auto-Breite für Eingabefelder
+    function autoResizeInput(el, placeholder) {
+      const testSpan = document.createElement("span");
+      testSpan.style.visibility = "hidden";
+      testSpan.style.whiteSpace = "pre";
+      document.body.appendChild(testSpan);
+      function resize() {
+        testSpan.textContent = el.value || placeholder;
+        el.style.width = testSpan.offsetWidth + 12 + "px";
+      }
+      el.addEventListener("input", resize);
+      resize();
+    }
+    autoResizeInput(qtyInput, "Menge");
+    autoResizeInput(nameInput, "Artikel");
 
     let authReady = false;
     onAuthStateChanged(auth, (user) => {
@@ -153,6 +163,8 @@
       if (!name) return;
       await addDoc(collection(db, "items"), { name, quantity: qty || "" });
       nameInput.value = ""; qtyInput.value = "";
+      nameInput.dispatchEvent(new Event("input"));
+      qtyInput.dispatchEvent(new Event("input"));
     };
 
     function makeEditable(span, field, docRef){
@@ -176,7 +188,6 @@
     onSnapshot(collection(db, "items"), (snapshot) => {
       const currentIds = new Set();
       listEl.innerHTML = "";
-
       snapshot.forEach((docSnap) => {
         const id = docSnap.id; currentIds.add(id);
         const data = docSnap.data();
@@ -195,10 +206,9 @@
         };
         li.appendChild(cb);
 
-        // Textblock mit Menge + Name
+        // Textblock
         const textBlock = document.createElement("div");
         textBlock.className = "text-block";
-
         const qtySpan = document.createElement("span");
         qtySpan.className = "qty editable";
         qtySpan.textContent = data.quantity || "";
@@ -213,7 +223,7 @@
         textBlock.appendChild(nameSpan);
         li.appendChild(textBlock);
 
-        // Rechte Seite (Buttons)
+        // Buttons
         const controls = document.createElement("div");
         controls.className = "controls";
 
@@ -248,7 +258,6 @@
 
         // Aufnahme-Logik
         let mediaRecorder = null, chunks = [], animationId = null, audioContext, analyser, source, dataArray;
-
         voiceBtn.onclick = async () => {
           if (!authReady) { alert("Warte auf Anmeldung..."); return; }
           if (mediaRecorder && mediaRecorder.state === "recording"){
