@@ -16,8 +16,8 @@
     ul { list-style: none; padding: 0; }
     li {
       background: #fff;
-      margin: 0.5rem 0;
-      padding: 0.5rem;
+      margin: 0.3rem 0;
+      padding: 0.3rem 0.5rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -63,9 +63,9 @@
       100% { transform: scale(1); }
     }
     .visualizer {
-      width: 40px;
-      height: 20px;
-      margin-right: 6px;
+      width: 30px;
+      height: 18px;
+      margin-right: 4px;
     }
     .disabled {
       opacity: 0.5;
@@ -78,14 +78,23 @@
     .editable {
       cursor: pointer;
     }
+    .item-info {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .quantity {
+      font-size: 0.85em;
+      color: #555;
+    }
   </style>
 </head>
 <body>
   <h1>Shared Shopping 🛒</h1>
 
   <div style="display:flex; margin-bottom:1rem;">
-    <input id="itemName" class="input-name" type="text" placeholder="Artikel..." />
     <input id="itemQty" class="input-qty" type="text" placeholder="Menge..." />
+    <input id="itemName" class="input-name" type="text" placeholder="Artikel..." />
     <button id="addBtn" class="btn-add disabled">➕</button>
   </div>
 
@@ -148,6 +157,7 @@
         const input = document.createElement("input");
         input.type = "text";
         input.value = span.textContent;
+        input.style.width = (span.textContent.length + 2) + "ch";
         span.replaceWith(input);
         input.focus();
         input.onblur = async () => {
@@ -170,21 +180,20 @@
         const li = document.createElement("li");
 
         const infoDiv = document.createElement("div");
-        infoDiv.style.display = "flex";
-        infoDiv.style.flexDirection = "column";
+        infoDiv.className = "item-info";
+
+        const qtySpan = document.createElement("span");
+        qtySpan.textContent = data.quantity || "";
+        qtySpan.classList.add("quantity", "editable");
+        makeEditable(qtySpan, "quantity", docRef);
 
         const nameSpan = document.createElement("span");
         nameSpan.textContent = data.name || "";
         nameSpan.classList.add("editable");
         makeEditable(nameSpan, "name", docRef);
 
-        const qtySpan = document.createElement("span");
-        qtySpan.textContent = data.quantity || "";
-        qtySpan.classList.add("editable");
-        makeEditable(qtySpan, "quantity", docRef);
-
-        infoDiv.appendChild(nameSpan);
         infoDiv.appendChild(qtySpan);
+        infoDiv.appendChild(nameSpan);
         li.appendChild(infoDiv);
 
         const controls = document.createElement("div");
