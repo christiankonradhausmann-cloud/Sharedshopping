@@ -5,107 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Shared Shopping</title>
   <style>
-    :root {
-      --green: #2ecc71;
-      --red: #e74c3c;
-      --blue: #3498db;
-      --bg: #f7f7f7;
-      --card: #ffffff;
-      --muted: #888;
-    }
-    * { box-sizing: border-box; }
-    body {
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-      max-width: 520px;
-      margin: auto;
-      padding: 1rem;
-      background: var(--bg);
-    }
-    h1 {
-      font-size: 1.6rem;
-      text-align: center;
-      margin: 0 0 1rem 0;
-    }
-    .row {
-      display: flex;
-      gap: .5rem;
-      margin-bottom: .75rem;
-    }
-    input[type="text"] {
-      flex: 1;
-      padding: .6rem .7rem;
-      border-radius: 8px;
-      border: 1px solid #ddd;
-      background: #fff;
-      font-size: 1rem;
-    }
-    button {
-      border: none;
-      color: #fff;
-      padding: .55rem .8rem;
-      cursor: pointer;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 1rem;
-    }
-    .btn-add { background: var(--green); }
-    .btn-del { background: var(--red); padding: .4rem .55rem; border-radius: 8px; min-width: 2.2rem; text-align: center; }
-    .btn-undo { background: var(--blue); }
-    .btn-secondary { background: #444; }
-    .btn-muted { background: #bbb; color: #222; }
-    .btn-mic { background: var(--blue); }
-    .btn-play { background: #555; }
-
-    ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: grid;
-      gap: .5rem;
-    }
-    li {
-      background: var(--card);
-      padding: .6rem .7rem;
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      align-items: center;
-      gap: .6rem;
-      border-radius: 8px;
-      border: 1px solid #eee;
-    }
-    .item-name {
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-      padding-right: .25rem;
-    }
-    .tools { display: flex; gap: .4rem; flex-wrap: wrap; }
-    .bulk-bar {
-      display: flex;
-      gap: .5rem;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 1rem;
-      flex-wrap: wrap;
-    }
-    .bulk-left, .bulk-right { display: flex; gap: .5rem; align-items: center; }
-    .hint { color: var(--muted); font-size: .9rem; }
-    .note { color: var(--muted); font-size: .85rem; margin-top: .25rem; }
+    :root { --green:#2ecc71; --red:#e74c3c; --blue:#3498db; --bg:#f7f7f7; --card:#fff; --muted:#888; }
+    *{box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:520px;margin:auto;padding:1rem;background:var(--bg)}
+    h1{font-size:1.6rem;text-align:center;margin:0 0 1rem}
+    .row{display:flex;gap:.5rem;margin-bottom:.75rem}
+    input[type="text"]{flex:1;padding:.6rem .7rem;border-radius:8px;border:1px solid #ddd;background:#fff;font-size:1rem}
+    button{border:none;color:#fff;padding:.55rem .8rem;cursor:pointer;border-radius:8px;font-weight:600;font-size:1rem}
+    .btn-add{background:var(--green)} .btn-del{background:var(--red);padding:.4rem .55rem;border-radius:8px;min-width:2.2rem;text-align:center}
+    .btn-undo{background:var(--blue)} .btn-secondary{background:#444} .btn-muted{background:#bbb;color:#222}
+    .btn-mic{background:var(--blue)} .btn-play{background:#555}
+    ul{list-style:none;padding:0;margin:0;display:grid;gap:.5rem}
+    li{background:var(--card);padding:.6rem .7rem;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.6rem;border-radius:8px;border:1px solid #eee}
+    .item-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:.25rem}
+    .tools{display:flex;gap:.4rem;flex-wrap:wrap}
+    .bulk-bar{display:flex;gap:.5rem;justify-content:space-between;align-items:center;margin-top:1rem;flex-wrap:wrap}
+    .bulk-left,.bulk-right{display:flex;gap:.5rem;align-items:center}
+    .hint{color:var(--muted);font-size:.9rem}
+    .note{color:var(--muted);font-size:.85rem;margin-top:.25rem}
   </style>
 </head>
 <body>
   <h1>Shared Shopping 🛒</h1>
 
-  <!-- Eingabezeile -->
   <div class="row">
     <input id="itemInput" type="text" placeholder="Neuer Artikel …" />
     <button id="addBtn" class="btn-add" title="Artikel hinzufügen">➕</button>
   </div>
 
-  <!-- Liste -->
   <ul id="list"></ul>
 
-  <!-- Bulk-Actions unten -->
   <div class="bulk-bar">
     <div class="bulk-left">
       <button id="toggleAllBtn" class="btn-secondary" title="Alle auswählen / Auswahl aufheben">Alle auswählen</button>
@@ -117,18 +46,15 @@
     </div>
   </div>
 
-  <p class="note">Hinweis: Du kannst pro Eintrag eine Sprachnotiz (max. 60 s) aufnehmen. 🎙️</p>
+  <p class="note">Hinweis: Sprachnotiz (max. 60 s). Auf iPhone/iPad wird als M4A gespeichert.</p>
 
   <script type="module">
-    // Firebase SDKs laden
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
     import {
       getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc,
       getDocs, writeBatch, updateDoc
     } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
-    import {
-      getStorage, ref, uploadBytes, getDownloadURL
-    } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-storage.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-storage.js";
 
     // 🔹 Deine Firebase-Konfiguration
     const firebaseConfig = {
@@ -140,12 +66,10 @@
       appId: "1:53181558287:web:22e89caC4fde099361c10a"
     };
 
-    // Firebase init
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const storage = getStorage(app);
 
-    // DOM-Refs
     const listEl = document.getElementById("list");
     const itemInput = document.getElementById("itemInput");
     const addBtn = document.getElementById("addBtn");
@@ -154,20 +78,20 @@
     const toggleAllBtn = document.getElementById("toggleAllBtn");
     const selectionHint = document.getElementById("selectionHint");
 
-    // Auswahl & Undo
     const selectedIds = new Set();
     let lastDeletedItems = []; // { id, name, voiceUrl? }
 
-    // Aufnahme-Status
+    // Aufnahme-State
     let mediaRecorder = null;
     let recordingForId = null;
     let recordTimeout = null;
     let chunks = [];
 
-    // Feature-Check
-    const canRecord = !!(navigator.mediaDevices && window.MediaRecorder);
+    // iOS / Safari erkennen
+    const ua = navigator.userAgent || "";
+    const isIOS = /iPad|iPhone|iPod/.test(ua);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
 
-    // Render via Echtzeit-Listener
     onSnapshot(collection(db, "items"), (snapshot) => {
       const currentIds = new Set();
       listEl.innerHTML = "";
@@ -179,48 +103,47 @@
 
         const li = document.createElement("li");
 
-        // Checkbox
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
         checkbox.checked = selectedIds.has(id);
         checkbox.addEventListener("change", () => {
-          if (checkbox.checked) selectedIds.add(id);
-          else selectedIds.delete(id);
+          if (checkbox.checked) selectedIds.add(id); else selectedIds.delete(id);
           updateSelectionUI();
         });
 
-        // Name
         const name = document.createElement("span");
         name.className = "item-name";
         name.textContent = data.name;
 
-        // Tools: Play (falls vorhanden), Record, Delete
         const tools = document.createElement("div");
         tools.className = "tools";
 
-        // Play
+        // Abspielen
         const playBtn = document.createElement("button");
         playBtn.className = "btn-play";
         playBtn.textContent = "🔊";
         playBtn.title = data.voiceUrl ? "Sprachnotiz abspielen" : "Keine Sprachnotiz vorhanden";
         playBtn.disabled = !data.voiceUrl;
-        playBtn.onclick = () => {
+        playBtn.onclick = async () => {
           if (!data.voiceUrl) return;
-          const audio = new Audio(data.voiceUrl);
-          audio.play();
+          // Audio-Element verwenden (besseres Verhalten in iOS)
+          const audio = document.createElement("audio");
+          audio.src = data.voiceUrl;
+          audio.preload = "none";
+          audio.playsInline = true; // iOS wichtig
+          audio.currentTime = 0;
+          try { await audio.play(); } catch (e) { alert("Konnte Audio nicht abspielen: " + e.message); }
         };
         tools.appendChild(playBtn);
 
-        // Record
+        // Aufnehmen
         const recBtn = document.createElement("button");
         recBtn.className = "btn-mic";
         recBtn.textContent = (recordingForId === id) ? "■ Stopp" : "🎙️";
-        recBtn.title = canRecord ? "Sprachnotiz aufnehmen (max. 60 s)" : "Aufnahme nicht unterstützt";
-        recBtn.disabled = !canRecord;
+        recBtn.title = "Sprachnotiz aufnehmen (max. 60 s)";
         recBtn.onclick = () => toggleRecord(id, recBtn, playBtn);
         tools.appendChild(recBtn);
 
-        // Einzel-Löschen
         const delBtn = document.createElement("button");
         delBtn.className = "btn-del";
         delBtn.textContent = "🗑";
@@ -234,70 +157,71 @@
         listEl.appendChild(li);
       });
 
-      // Auswahl aufräumen, falls Items verschwunden sind
       [...selectedIds].forEach(id => { if (!currentIds.has(id)) selectedIds.delete(id); });
       updateSelectionUI();
     });
 
-    // Aufnahme starten/stoppen & speichern
     async function toggleRecord(itemId, recBtn, playBtn) {
       try {
+        // Stoppen?
         if (recordingForId === itemId && mediaRecorder && mediaRecorder.state === "recording") {
-          // Stopp
           mediaRecorder.stop();
           recBtn.textContent = "🎙️";
           clearTimeout(recordTimeout);
           return;
         }
-
-        // Falls andere Aufnahme läuft: abbrechen
+        // evtl. laufende Aufnahme beenden
         if (mediaRecorder && mediaRecorder.state === "recording") {
           mediaRecorder.stop();
           clearTimeout(recordTimeout);
         }
 
-        // Neue Aufnahme
+        // iOS benötigt user-gesture (der Click ist einer) + HTTPS (Vercel hat https)
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         chunks = [];
-        mediaRecorder = new MediaRecorder(stream, { mimeType: getPreferredMimeType() });
+
+        // Bevorzugte Formate: iOS/Safari → audio/mp4 (m4a); sonst audio/webm
+        const preferredTypes = (isIOS || isSafari)
+          ? ["audio/mp4", "audio/aac", "audio/mpeg"]
+          : ["audio/webm", "audio/ogg", "audio/mp4"];
+
+        const mimeType = preferredTypes.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || "";
+        mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
         recordingForId = itemId;
 
         mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
         mediaRecorder.onstop = async () => {
-          const blob = new Blob(chunks, { type: mediaRecorder.mimeType });
-          // Max. 60 s sind schon durch Timeout gesichert – jetzt hochladen
+          const type = mediaRecorder.mimeType || mimeType || (isIOS ? "audio/mp4" : "audio/webm");
+          const blob = new Blob(chunks, { type });
           await uploadVoice(itemId, blob, playBtn);
-          // Streams beenden
           stream.getTracks().forEach(t => t.stop());
           recordingForId = null;
         };
 
         mediaRecorder.start();
         recBtn.textContent = "■ Stopp";
-        // Nach 60 s automatisch stoppen
         recordTimeout = setTimeout(() => {
           if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
         }, 60000);
 
       } catch (err) {
-        alert("Konnte Mikrofon nicht verwenden: " + err.message);
+        alert("Mikrofon nicht verfügbar: " + err.message);
       }
-    }
-
-    function getPreferredMimeType() {
-      // Versuche gängige Audio-MIME-Typen; iOS Safari unterstützt idR audio/webm
-      const types = ["audio/webm", "audio/mp4", "audio/ogg"];
-      for (const t of types) {
-        if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) return t;
-      }
-      return ""; // Browser wählt Standard
     }
 
     async function uploadVoice(itemId, blob, playBtn) {
       try {
-        const ext = blob.type.includes("webm") ? "webm" : blob.type.includes("ogg") ? "ogg" : "m4a";
+        // Extension anhand MIME bestimmen
+        let ext = "m4a";
+        if (blob.type.includes("webm")) ext = "webm";
+        else if (blob.type.includes("ogg")) ext = "ogg";
+        else if (blob.type.includes("mpeg")) ext = "mp3";
+        else if (blob.type.includes("aac")) ext = "aac";
+        else if (blob.type.includes("mp4")) ext = "m4a";
+
         const objectRef = ref(storage, `voiceNotes/${itemId}.${ext}`);
-        await uploadBytes(objectRef, blob);
+        // WICHTIG: den Content‑Type setzen, sonst kann Safari nicht sauber abspielen
+        await uploadBytes(objectRef, blob, { contentType: blob.type || "audio/mp4" });
         const url = await getDownloadURL(objectRef);
         await updateDoc(doc(db, "items", itemId), { voiceUrl: url, voiceUpdatedAt: Date.now() });
         playBtn.disabled = false;
@@ -316,12 +240,11 @@
       itemInput.focus();
     }
 
-    // Ausgewählte löschen (mit Undo)
+    // Bulk‑Löschen (mit Undo)
     async function deleteSelected() {
       if (selectedIds.size === 0) return;
       if (!confirm(`${selectedIds.size} ausgewählte Einträge löschen?`)) return;
 
-      // Items für Undo puffern
       lastDeletedItems = [];
       const snap = await getDocs(collection(db, "items"));
       const toDelete = [];
@@ -342,7 +265,7 @@
       if (lastDeletedItems.length > 0) undoBtn.style.display = "inline-block";
     }
 
-    // „Alle auswählen“ / „Auswahl aufheben“
+    // Alle auswählen / aufheben
     async function toggleSelectAll() {
       const snap = await getDocs(collection(db, "items"));
       let total = 0, checked = 0;
@@ -352,7 +275,7 @@
       updateSelectionUI();
     }
 
-    // Undo (stellt letzte Lösch-Operation wieder her)
+    // Undo
     async function undoDelete() {
       if (lastDeletedItems.length === 0) return;
       for (const item of lastDeletedItems) {
@@ -367,15 +290,13 @@
       alert("Auswahl wiederhergestellt.");
     }
 
-    // UI-Status der Auswahl aktualisieren
     function updateSelectionUI() {
       const count = selectedIds.size;
       selectionHint.textContent = `${count} ausgewählt`;
       deleteSelectedBtn.disabled = count === 0;
       deleteSelectedBtn.classList.toggle("btn-muted", count === 0);
       const total = listEl.children.length;
-      toggleAllBtn.textContent = (count > 0 && count === total && count !== 0)
-        ? "Auswahl aufheben" : "Alle auswählen";
+      toggleAllBtn.textContent = (count > 0 && count === total) ? "Auswahl aufheben" : "Alle auswählen";
     }
 
     // Events
