@@ -12,9 +12,12 @@
     .row{display:flex;gap:.5rem;margin-bottom:.75rem}
     input[type="text"]{flex:1;padding:.6rem .7rem;border-radius:8px;border:1px solid #ddd;background:#fff;font-size:1rem}
     button{border:none;color:#fff;padding:.55rem .8rem;cursor:pointer;border-radius:8px;font-weight:600;font-size:1rem}
-    .btn-add{background:var(--green)} .btn-del{background:var(--red);padding:.4rem .55rem;border-radius:8px;min-width:2.2rem;text-align:center}
-    .btn-undo{background:var(--blue)} .btn-secondary{background:#444} .btn-muted{background:#bbb;color:#222}
-    .btn-mic{background:var(--blue)} .btn-play{background:#555}
+    .btn-add{background:var(--green)}
+    .btn-del{background:var(--red);padding:.4rem .55rem;border-radius:8px;min-width:2.2rem;text-align:center}
+    .btn-undo{background:var(--blue)}
+    .btn-secondary{background:#444}
+    .btn-muted{background:#bbb;color:#222}
+    .btn-voice{background:var(--blue)}
     ul{list-style:none;padding:0;margin:0;display:grid;gap:.5rem}
     li{background:var(--card);padding:.6rem .7rem;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.6rem;border-radius:8px;border:1px solid #eee}
     .item-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:.25rem}
@@ -46,7 +49,7 @@
     </div>
   </div>
 
-  <p class="note">Hinweis: Sprachnotiz (max. 60 s). Auf iPhone/iPad wird als M4A gespeichert.</p>
+  <p class="note">Tipp: Ein Klick auf den blauen Button <strong>🎙️/■/🔊</strong> startet/stopp die Aufnahme oder spielt die Notiz ab (max. 60 s).</p>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
@@ -56,7 +59,7 @@
     } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-storage.js";
 
-    // 🔹 Deine Firebase-Konfiguration
+    // 🔹 Firebase-Konfiguration (deine Werte)
     const firebaseConfig = {
       apiKey: "AIzaSyBpdSLE4T0HhHj9x3664a7DnxC2043JU",
       authDomain: "shoppinglist-66fa7.firebaseapp.com",
@@ -81,17 +84,18 @@
     const selectedIds = new Set();
     let lastDeletedItems = []; // { id, name, voiceUrl? }
 
-    // Aufnahme-State
+    // Aufnahme/Abspielen-Status
     let mediaRecorder = null;
     let recordingForId = null;
     let recordTimeout = null;
     let chunks = [];
+    let currentAudio = null; // gerade spielendes Audio
 
-    // iOS / Safari erkennen
     const ua = navigator.userAgent || "";
     const isIOS = /iPad|iPhone|iPod/.test(ua);
     const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
 
+    // ---------- Render ----------
     onSnapshot(collection(db, "items"), (snapshot) => {
       const currentIds = new Set();
       listEl.innerHTML = "";
@@ -103,6 +107,7 @@
 
         const li = document.createElement("li");
 
+        // Auswahl-Checkbox
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
         checkbox.checked = selectedIds.has(id);
@@ -111,38 +116,21 @@
           updateSelectionUI();
         });
 
+        // Name
         const name = document.createElement("span");
         name.className = "item-name";
         name.textContent = data.name;
 
+        // Tools: EIN Button für Voice + Einzel-Löschen
         const tools = document.createElement("div");
         tools.className = "tools";
 
-        // Abspielen
-        const playBtn = document.createElement("button");
-        playBtn.className = "btn-play";
-        playBtn.textContent = "🔊";
-        playBtn.title = data.voiceUrl ? "Sprachnotiz abspielen" : "Keine Sprachnotiz vorhanden";
-        playBtn.disabled = !data.voiceUrl;
-        playBtn.onclick = async () => {
-          if (!data.voiceUrl) return;
-          // Audio-Element verwenden (besseres Verhalten in iOS)
-          const audio = document.createElement("audio");
-          audio.src = data.voiceUrl;
-          audio.preload = "none";
-          audio.playsInline = true; // iOS wichtig
-          audio.currentTime = 0;
-          try { await audio.play(); } catch (e) { alert("Konnte Audio nicht abspielen: " + e.message); }
-        };
-        tools.appendChild(playBtn);
-
-        // Aufnehmen
-        const recBtn = document.createElement("button");
-        recBtn.className = "btn-mic";
-        recBtn.textContent = (recordingForId === id) ? "■ Stopp" : "🎙️";
-        recBtn.title = "Sprachnotiz aufnehmen (max. 60 s)";
-        recBtn.onclick = () => toggleRecord(id, recBtn, playBtn);
-        tools.appendChild(recBtn);
+        const voiceBtn = document.createElement("button");
+        voiceBtn.className = "btn-voice";
+        voiceBtn.textContent = (recordingForId === id) ? "■" : (data.voiceUrl ? "🔊" : "🎙️");
+        voiceBtn.title = data.voiceUrl ? "Abspielen" : "Aufnehmen";
+        voiceBtn.onclick = () => handleVoiceButton(id, data, voiceBtn);
+        tools.appendChild(voiceBtn);
 
         const delBtn = document.createElement("button");
         delBtn.className = "btn-del";
@@ -157,49 +145,73 @@
         listEl.appendChild(li);
       });
 
+      // Auswahl aufräumen
       [...selectedIds].forEach(id => { if (!currentIds.has(id)) selectedIds.delete(id); });
       updateSelectionUI();
     });
 
-    async function toggleRecord(itemId, recBtn, playBtn) {
-      try {
-        // Stoppen?
-        if (recordingForId === itemId && mediaRecorder && mediaRecorder.state === "recording") {
-          mediaRecorder.stop();
-          recBtn.textContent = "🎙️";
-          clearTimeout(recordTimeout);
-          return;
+    // ---------- Voice: Single-Button-Logik ----------
+    async function handleVoiceButton(itemId, data, btn) {
+      // 1) Wenn gerade für dieses Item aufgenommen wird → stoppen
+      if (recordingForId === itemId && mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+        btn.textContent = "🎙️";
+        clearTimeout(recordTimeout);
+        return;
+      }
+
+      // 2) Wenn bereits eine Notiz existiert → abspielen
+      if (data.voiceUrl && !mediaRecorder) {
+        try {
+          if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+          const audio = document.createElement("audio");
+          audio.src = data.voiceUrl;
+          audio.preload = "none";
+          audio.playsInline = true;
+          currentAudio = audio;
+          await audio.play();
+        } catch (e) {
+          alert("Konnte Audio nicht abspielen: " + e.message);
         }
-        // evtl. laufende Aufnahme beenden
+        return;
+      }
+
+      // 3) Ansonsten Aufnahme starten
+      try {
+        // Falls andere Aufnahme läuft → beenden
         if (mediaRecorder && mediaRecorder.state === "recording") {
           mediaRecorder.stop();
           clearTimeout(recordTimeout);
         }
 
-        // iOS benötigt user-gesture (der Click ist einer) + HTTPS (Vercel hat https)
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         chunks = [];
 
-        // Bevorzugte Formate: iOS/Safari → audio/mp4 (m4a); sonst audio/webm
-        const preferredTypes = (isIOS || isSafari)
+        // iOS/Safari bevorzugt MP4/AAC, sonst WebM
+        const preferred = (isIOS || isSafari)
           ? ["audio/mp4", "audio/aac", "audio/mpeg"]
           : ["audio/webm", "audio/ogg", "audio/mp4"];
+        const mimeType = preferred.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || "";
 
-        const mimeType = preferredTypes.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || "";
         mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
         recordingForId = itemId;
 
         mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
         mediaRecorder.onstop = async () => {
-          const type = mediaRecorder.mimeType || mimeType || (isIOS ? "audio/mp4" : "audio/webm");
-          const blob = new Blob(chunks, { type });
-          await uploadVoice(itemId, blob, playBtn);
-          stream.getTracks().forEach(t => t.stop());
-          recordingForId = null;
+          try {
+            const type = mediaRecorder.mimeType || mimeType || (isIOS ? "audio/mp4" : "audio/webm");
+            const blob = new Blob(chunks, { type });
+            await uploadVoice(itemId, blob, btn);
+          } catch (err) {
+            alert("Fehler beim Speichern: " + err.message);
+          } finally {
+            stream.getTracks().forEach(t => t.stop());
+            recordingForId = null;
+          }
         };
 
         mediaRecorder.start();
-        recBtn.textContent = "■ Stopp";
+        btn.textContent = "■";
         recordTimeout = setTimeout(() => {
           if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
         }, 60000);
@@ -209,29 +221,25 @@
       }
     }
 
-    async function uploadVoice(itemId, blob, playBtn) {
-      try {
-        // Extension anhand MIME bestimmen
-        let ext = "m4a";
-        if (blob.type.includes("webm")) ext = "webm";
-        else if (blob.type.includes("ogg")) ext = "ogg";
-        else if (blob.type.includes("mpeg")) ext = "mp3";
-        else if (blob.type.includes("aac")) ext = "aac";
-        else if (blob.type.includes("mp4")) ext = "m4a";
+    async function uploadVoice(itemId, blob, btn) {
+      if (!blob.size) throw new Error("Aufnahme leer (0 Bytes).");
+      let ext = "m4a";
+      if (blob.type.includes("webm")) ext = "webm";
+      else if (blob.type.includes("ogg")) ext = "ogg";
+      else if (blob.type.includes("mpeg")) ext = "mp3";
+      else if (blob.type.includes("aac")) ext = "aac";
+      else if (blob.type.includes("mp4")) ext = "m4a";
 
-        const objectRef = ref(storage, `voiceNotes/${itemId}.${ext}`);
-        // WICHTIG: den Content‑Type setzen, sonst kann Safari nicht sauber abspielen
-        await uploadBytes(objectRef, blob, { contentType: blob.type || "audio/mp4" });
-        const url = await getDownloadURL(objectRef);
-        await updateDoc(doc(db, "items", itemId), { voiceUrl: url, voiceUpdatedAt: Date.now() });
-        playBtn.disabled = false;
-        playBtn.title = "Sprachnotiz abspielen";
-      } catch (e) {
-        alert("Upload fehlgeschlagen: " + e.message);
-      }
+      const objectRef = ref(storage, `voiceNotes/${itemId}.${ext}`);
+      await uploadBytes(objectRef, blob, { contentType: blob.type || "audio/mp4" });
+      const url = await getDownloadURL(objectRef);
+      await updateDoc(doc(db, "items", itemId), { voiceUrl: url, voiceUpdatedAt: Date.now() });
+
+      btn.textContent = "🔊";
+      btn.title = "Abspielen";
     }
 
-    // Hinzufügen
+    // ---------- Items ----------
     async function addItem() {
       const name = itemInput.value.trim();
       if (!name) return;
@@ -240,7 +248,6 @@
       itemInput.focus();
     }
 
-    // Bulk‑Löschen (mit Undo)
     async function deleteSelected() {
       if (selectedIds.size === 0) return;
       if (!confirm(`${selectedIds.size} ausgewählte Einträge löschen?`)) return;
@@ -249,10 +256,7 @@
       const snap = await getDocs(collection(db, "items"));
       const toDelete = [];
       snap.forEach(d => {
-        if (selectedIds.has(d.id)) {
-          lastDeletedItems.push({ id: d.id, ...d.data() });
-          toDelete.push(d.id);
-        }
+        if (selectedIds.has(d.id)) { lastDeletedItems.push({ id: d.id, ...d.data() }); toDelete.push(d.id); }
       });
       if (toDelete.length === 0) return;
 
@@ -265,7 +269,6 @@
       if (lastDeletedItems.length > 0) undoBtn.style.display = "inline-block";
     }
 
-    // Alle auswählen / aufheben
     async function toggleSelectAll() {
       const snap = await getDocs(collection(db, "items"));
       let total = 0, checked = 0;
@@ -275,7 +278,6 @@
       updateSelectionUI();
     }
 
-    // Undo
     async function undoDelete() {
       if (lastDeletedItems.length === 0) return;
       for (const item of lastDeletedItems) {
