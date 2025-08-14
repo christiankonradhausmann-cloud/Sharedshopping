@@ -84,6 +84,11 @@
       display:flex;justify-content:space-between;align-items:center;
       margin-top:.75rem;flex-wrap:wrap;gap:.5rem
     }
+    .bulk-bar > div {
+      display:flex;
+      align-items:center;
+      gap:.5rem;
+    }
     .btn-secondary{background:#444}
     .btn-muted{background:#bbb;color:#222}
     .hint{color:#777;font-size:.9rem}
@@ -125,7 +130,7 @@
     </div>
     <div>
       <button id="undoBtn" class="btn-secondary" style="display:none;">↩ Rückgängig</button>
-      <button id="deleteSelectedBtn" class="btn-del btn-muted" disabled>Auswahl löschen</button>
+      <button id="deleteSelectedBtn" class="btn-del btn-muted" disabled>Auswahllöschen</button>
     </div>
   </div>
 
@@ -165,7 +170,6 @@
     let lastDeletedItems = [];
 
     /* ===== Passwort-Gate Logik ===== */
-    // SHA-256("pepper")
     const PASSWORD_SHA256_HEX = "8cbbcf29d9cef89675c5f5c1dcfe827d0570416a5aaba30dd0de159661ad905b";
     async function sha256Hex(str){
       const enc = new TextEncoder().encode(str);
@@ -206,7 +210,7 @@
     autoResizeInput(qtyInput, "Menge");
     autoResizeInput(nameInput, "Artikel");
 
-    /* ===== Auth (anonym) für Storage/Firestore ===== */
+    /* ===== Auth (anonym) ===== */
     let authReady = false;
     onAuthStateChanged(auth, (user) => {
       if (user) { authReady = true; addBtn.classList.remove("disabled"); }
@@ -244,7 +248,7 @@
       };
     }
 
-    /* ===== Render + Aufnahme/Audio ===== */
+    /* ===== Render + Audio ===== */
     onSnapshot(collection(db, "items"), (snapshot) => {
       const currentIds = new Set();
       listEl.innerHTML = "";
@@ -255,14 +259,12 @@
 
         const li = document.createElement("li");
 
-        // Checkbox
         const cb = document.createElement("input");
         cb.type = "checkbox"; cb.className = "cb-small";
         cb.checked = selectedIds.has(id);
         cb.onchange = () => { if (cb.checked) selectedIds.add(id); else selectedIds.delete(id); updateSelectionUI(); };
         li.appendChild(cb);
 
-        // Textblock
         const textBlock = document.createElement("div");
         textBlock.className = "text-block";
         const qtySpan = document.createElement("span");
@@ -277,7 +279,6 @@
         textBlock.appendChild(nameSpan);
         li.appendChild(textBlock);
 
-        // Buttons
         const controls = document.createElement("div");
         controls.className = "controls";
         const canvas = document.createElement("canvas");
@@ -302,7 +303,6 @@
         li.appendChild(controls);
         listEl.appendChild(li);
 
-        // Aufnahme-Logik
         let mediaRecorder = null, chunks = [], animationId = null, audioContext, analyser, source, dataArray;
         voiceBtn.onclick = async () => {
           if (!authReady) { alert("Warte auf Anmeldung..."); return; }
@@ -351,39 +351,4 @@
       if (toDelete.length === 0) return;
       const batch = writeBatch(db); toDelete.forEach(id => batch.delete(doc(db,"items",id)));
       await batch.commit(); selectedIds.clear(); updateSelectionUI();
-      if (lastDeletedItems.length > 0) document.getElementById("undoBtn").style.display = "inline-block";
-    };
-
-    toggleAllBtn.onclick = async () => {
-      const snap = await getDocs(collection(db, "items"));
-      let total = 0, checked = 0;
-      snap.forEach(d => { total++; if (selectedIds.has(d.id)) checked++; });
-      const selectAll = checked !== total;
-      snap.forEach(d => { if (selectAll) selectedIds.add(d.id); else selectedIds.delete(d.id); });
-      // Checkboxen im DOM spiegeln
-      document.querySelectorAll(".cb-small").forEach(cb => { cb.checked = selectAll; });
-      updateSelectionUI();
-    };
-
-    undoBtn.onclick = async () => {
-      if (lastDeletedItems.length === 0) return;
-      for (const it of lastDeletedItems){
-        const payload = { name: it.name || "", quantity: it.quantity || "" };
-        if (it.voiceUrl) payload.voiceUrl = it.voiceUrl;
-        await addDoc(collection(db, "items"), payload);
-      }
-      lastDeletedItems = []; undoBtn.style.display = "none"; selectedIds.clear(); updateSelectionUI();
-      alert("Auswahl wiederhergestellt.");
-    };
-
-    function updateSelectionUI(){
-      const count = selectedIds.size;
-      selectionHint.textContent = `${count} ausgewählt`;
-      deleteSelectedBtn.disabled = count === 0;
-      deleteSelectedBtn.classList.toggle("btn-muted", count === 0);
-      const total = listEl.children.length;
-      toggleAllBtn.textContent = (count > 0 && count === total) ? "Auswahl aufheben" : "Alle auswählen";
-    }
-  </script>
-</body>
-</html>
+      if (lastDeletedItems.length > 0) document.getElementById("undoBtn").style.display = "inline
